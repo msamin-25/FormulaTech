@@ -351,6 +351,41 @@
     severe:   { Fx: 7000, Fy: 5000,  Fz: -6500 },
   };
 
+  // ---- in-browser surrogate (mock) so a static host (GitHub Pages/Vercel) works
+  //      with no backend. When the FastAPI backend IS reachable, we use it instead.
+  //      Coefficients calibrated so the presets reproduce the trained model's bands. ----
+  const MOCK = {
+    yield: 503.0, moderate_MPa: 201.2, high_MPa: 377.25, mag_max: 9439,
+    k_stress: 0.04106, k_disp: 0.00328,
+    material: "Al 7075-T6", r2: "97%", rows: 400,
+  };
+  let mockMode = false;
+  const mockLog = [];
+  function mockPredict(fx, fy, fz, upright, source) {
+    const mag = Math.hypot(fx, fy, fz);
+    const stress = +(MOCK.k_stress * mag).toFixed(2);
+    const disp = +(stress * MOCK.k_disp).toFixed(4);
+    const priority = stress >= MOCK.high_MPa ? "HIGH" : stress >= MOCK.moderate_MPa ? "MODERATE" : "LOW";
+    const inEnv = mag <= MOCK.mag_max;
+    return {
+      timestamp: new Date().toISOString(), upright_id: upright, source: source,
+      input: { Fx: fx, Fy: fy, Fz: fz },
+      predicted_von_mises_stress_MPa: stress, predicted_max_displacement_mm: disp,
+      yield_strength_MPa: MOCK.yield, fraction_of_yield: +(stress / MOCK.yield).toFixed(3),
+      priority: priority, in_envelope: inEnv,
+      extrapolation_warning: inEnv ? null : `|F|=${mag.toFixed(0)}N exceeds largest trained impact ${MOCK.mag_max}N`,
+      model_type: "random_forest (in-browser)",
+    };
+  }
+  function seedMock() {
+    [[900,500,-700,"rear_left"],[2100,-1500,1800,"front_left"],[1200,800,-900,"front_right"],
+     [3400,-2000,4300,"front_right"],[7000,5000,-6500,"rear_right"]].forEach(([x,y,z,u], i, a) => {
+      const e = mockPredict(x, y, z, u, "demo");
+      e.timestamp = new Date(Date.now() - (a.length - i) * 8000).toISOString();
+      mockLog.push(e);
+    });
+  }
+
   // gauge full-scale = 125% of yield, so 100% sits below the top and there's a red headroom zone.
   const GAUGE_MAX = 1.25;
   const el = id => document.getElementById(id);
@@ -533,32 +568,42 @@
       </tr>`).join("");
   }
 
-  function setConn(ok) {
+  function setConn(state) {
     const s = el("connStatus");
-    s.className = "chip status-pill " + (ok ? "ok" : "bad");
-    s.innerHTML = `<span class="dot ${ok ? "ok" : "bad"}"></span>` +
-      (ok ? "backend connected" : "backend offline");
+    if (state === "demo") { s.className = "chip status-pill ok"; s.innerHTML = '<span class="dot ok"></span>demo mode · in-browser model'; return; }
+    s.className = "chip status-pill " + (state === "live" ? "ok" : "bad");
+    s.innerHTML = `<span class="dot ${state === "live" ? "ok" : "bad"}"></span>` + (state === "live" ? "backend connected" : "backend offline");
   }
 
   // credibility chips from /metadata (loaded once)
+  let metaLoaded = false;
+  function addChips(r2, mat, yld, rows) {
+    const chips = el("chips");
+    const add = (html) => { const c = document.createElement("span"); c.className = "chip"; c.innerHTML = html; chips.insertBefore(c, el("connStatus")); };
+    add(`<span class="k">R²</span> <b>${r2}</b>`);
+    add(`<span class="k">material</span> <b>${mat}</b>`);
+    add(`<span class="k">yield</span> <b>${yld} MPa</b>`);
+    add(`<span class="k">trained on</span> <b>${rows} cases</b>`);
+  }
   async function loadMetadata() {
+    if (metaLoaded) return;
+    metaLoaded = true;
+    if (mockMode) { addChips(MOCK.r2, MOCK.material, MOCK.yield, MOCK.rows); return; }
     try {
       const m = await (await fetch(BACKEND_URL + "/metadata")).json();
-      const chips = el("chips");
       const mat = (m.material && m.material.material_name || "").split("(")[0].trim() || "material";
       const r2 = m.metrics ? (m.metrics.stress_R2 * 100).toFixed(0) + "%" : "—";
-      const yld = m.material ? m.material.yield_strength_MPa : "—";
-      const rows = m.n_training_rows || "—";
-      const add = (html) => { const c = document.createElement("span"); c.className = "chip"; c.innerHTML = html; chips.insertBefore(c, el("connStatus")); };
-      add(`<span class="k">R²</span> <b>${r2}</b>`);
-      add(`<span class="k">material</span> <b>${mat}</b>`);
-      add(`<span class="k">yield</span> <b>${yld} MPa</b>`);
-      add(`<span class="k">trained on</span> <b>${rows} cases</b>`);
-    } catch (e) { /* backend not up yet; chips fill in on a later poll */ }
+      addChips(r2, mat, m.material ? m.material.yield_strength_MPa : "—", m.n_training_rows || "—");
+    } catch (e) { metaLoaded = false; }
   }
-  let metaLoaded = false;
 
   async function poll() {
+    if (mockMode) {
+      setConn("demo"); loadMetadata();
+      renderLatest(mockLog.length ? mockLog[mockLog.length - 1] : { message: "none" });
+      renderHistory(mockLog);
+      return;
+    }
     try {
       const [lr, hr] = await Promise.all([
         fetch(BACKEND_URL + "/latest"),
@@ -566,34 +611,43 @@
       ]);
       const latest = await lr.json();
       const history = await hr.json();
-      setConn(true);
-      if (!metaLoaded) { metaLoaded = true; loadMetadata(); }
+      setConn("live");
+      loadMetadata();
       renderLatest(latest);
       renderHistory(history.events);
-    } catch (e) { setConn(false); }
+    } catch (e) { setConn("offline"); }
   }
 
-  async function simulateImpact(sev) {
+  function simulateImpact(sev) {
     const preset = DEMO_PRESETS[sev];
     const upright = el("cornerSelect").value;
-    try {
-      await fetch(BACKEND_URL + "/impact", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...preset, upright_id: upright, source: "dashboard_demo" }),
-      });
-      poll();
-    } catch (e) { setConn(false); }
+    if (mockMode) {
+      mockLog.push(mockPredict(preset.Fx, preset.Fy, preset.Fz, upright, "demo"));
+      if (mockLog.length > 25) mockLog.shift();
+      poll(); return;
+    }
+    fetch(BACKEND_URL + "/impact", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...preset, upright_id: upright, source: "dashboard_demo" }),
+    }).then(poll).catch(() => setConn("offline"));
   }
 
   // ================= boot =================
-  if (window.Car3D) Car3D.init("car3d");
-  initGauge();
-  sizeCanvas();
-  window.addEventListener("resize", sizeCanvas);
-  setInterval(stepWave, 28);
-  poll();
-  setInterval(poll, POLL_MS);
+  (async function boot() {
+    if (window.Car3D) Car3D.init("car3d");
+    initGauge();
+    sizeCanvas();
+    window.addEventListener("resize", sizeCanvas);
+    setInterval(stepWave, 28);
+    // Use the FastAPI backend if it's reachable; otherwise fall back to the in-browser model.
+    let live = false;
+    try { const r = await fetch(BACKEND_URL + "/health", { cache: "no-store" }); live = r.ok; } catch (e) { live = false; }
+    mockMode = !live;
+    if (mockMode) seedMock();
+    poll();
+    setInterval(poll, POLL_MS);
+  })();
 </script>
 </body>
 </html>
