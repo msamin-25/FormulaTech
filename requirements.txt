@@ -1,0 +1,20 @@
+# ImpactIQ — Python dependencies (Python 3.10+ recommended)
+# Install with:  pip install -r requirements.txt
+
+# --- ML surrogate + data ---
+scikit-learn
+pandas
+numpy
+joblib
+
+# --- backend API (integration hub) ---
+fastapi
+uvicorn[standard]
+pydantic
+
+# --- impact detector + demo pre-flight (both import `requests`) ---
+requests
+pyserial
+
+# --- validation plot for judges (model/validate.py) ---
+matplotlib

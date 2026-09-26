@@ -1,0 +1,332 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>ImpactIQ Dashboard</title>
+<style>
+  :root {
+    --bg: #0f1420;
+    --panel: #171d2e;
+    --panel-border: #2a3350;
+    --text: #e8ecf6;
+    --muted: #8a93ad;
+    --low: #2ecc71;
+    --moderate: #f5a623;
+    --high: #e74c3c;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    padding: 24px;
+  }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .sub { color: var(--muted); font-size: 13px; margin-bottom: 20px; }
+  .grid {
+    display: grid;
+    grid-template-columns: 1.1fr 1fr;
+    gap: 20px;
+  }
+  @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: 12px;
+    padding: 20px;
+  }
+  .panel h2 { font-size: 14px; text-transform: uppercase; letter-spacing: .05em;
+              color: var(--muted); margin: 0 0 16px; }
+
+  .priority-badge {
+    display: inline-block;
+    font-size: 28px;
+    font-weight: 700;
+    padding: 10px 22px;
+    border-radius: 10px;
+    letter-spacing: .04em;
+  }
+  .priority-LOW { background: rgba(46,204,113,.15); color: var(--low); border: 1px solid var(--low); }
+  .priority-MODERATE { background: rgba(245,166,35,.15); color: var(--moderate); border: 1px solid var(--moderate); }
+  .priority-HIGH { background: rgba(231,76,60,.15); color: var(--high); border: 1px solid var(--high); animation: pulse 1.2s infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .55; } }
+
+  .metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 20px; }
+  .metric { background: rgba(255,255,255,.03); border-radius: 8px; padding: 12px 14px; }
+  .metric .label { color: var(--muted); font-size: 12px; }
+  .metric .value { font-size: 22px; font-weight: 600; margin-top: 2px; }
+
+  .meta { margin-top: 16px; font-size: 13px; color: var(--muted); line-height: 1.6; }
+
+  .envelope-warn {
+    margin-top: 14px; padding: 10px 12px; border-radius: 8px; font-size: 12.5px;
+    background: rgba(245,166,35,.12); border: 1px solid var(--moderate);
+    color: var(--moderate); line-height: 1.5;
+  }
+
+  svg { width: 100%; height: auto; }
+  .upright-dot { transition: fill .3s, r .3s; cursor: default; }
+  .upright-label { font-size: 11px; fill: var(--muted); text-anchor: middle; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--panel-border); }
+  th { color: var(--muted); font-weight: 500; font-size: 11px; text-transform: uppercase; }
+  tr.row-HIGH td:first-child { border-left: 3px solid var(--high); }
+  tr.row-MODERATE td:first-child { border-left: 3px solid var(--moderate); }
+  tr.row-LOW td:first-child { border-left: 3px solid var(--low); }
+
+  .empty { color: var(--muted); font-size: 14px; padding: 20px 0; text-align: center; }
+  #connStatus { font-size: 12px; }
+  .dot { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:6px; }
+  .dot.ok { background: var(--low); }
+  .dot.bad { background: var(--high); }
+
+  /* Demo control panel — the on-stage fallback if the Arduino isn't cooperating */
+  .demo-panel { margin-top: 20px; border-style: dashed; }
+  .demo-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+  .demo-row .lbl { color: var(--muted); font-size: 13px; margin-right: 4px; }
+  select, .demo-btn {
+    background: rgba(255,255,255,.05); color: var(--text);
+    border: 1px solid var(--panel-border); border-radius: 8px;
+    padding: 8px 14px; font-size: 14px; cursor: pointer; font-family: inherit;
+  }
+  .demo-btn:hover { background: rgba(255,255,255,.12); }
+  .demo-btn.mild:hover     { border-color: var(--low); color: var(--low); }
+  .demo-btn.moderate:hover { border-color: var(--moderate); color: var(--moderate); }
+  .demo-btn.severe:hover   { border-color: var(--high); color: var(--high); }
+  .demo-hint { color: var(--muted); font-size: 12px; margin-top: 10px; }
+</style>
+</head>
+<body>
+  <h1>ImpactIQ — Structural Triage Dashboard</h1>
+  <div class="sub">
+    Live post-impact inspection priority for race-car uprights &middot;
+    <span id="connStatus"><span class="dot bad"></span>connecting to backend...</span>
+  </div>
+
+  <div class="grid">
+    <div class="panel">
+      <h2>Latest Impact</h2>
+      <div id="latestEmpty" class="empty">No impacts recorded yet. Waiting for the first event...</div>
+      <div id="latestContent" style="display:none">
+        <span id="priorityBadge" class="priority-badge priority-LOW">LOW</span>
+        <div class="metrics">
+          <div class="metric">
+            <div class="label">Predicted Stress</div>
+            <div class="value" id="stressVal">—</div>
+          </div>
+          <div class="metric">
+            <div class="label">Predicted Displacement</div>
+            <div class="value" id="dispVal">—</div>
+          </div>
+          <div class="metric">
+            <div class="label">Fraction of Yield</div>
+            <div class="value" id="fracVal">—</div>
+          </div>
+          <div class="metric">
+            <div class="label">Upright</div>
+            <div class="value" id="uprightVal">—</div>
+          </div>
+        </div>
+        <div class="meta" id="metaInfo"></div>
+        <div class="envelope-warn" id="envelopeWarn" style="display:none"></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Affected Upright</h2>
+      <svg id="carSvg" viewBox="0 0 240 380">
+        <!-- simple top-down car outline -->
+        <rect x="60" y="20" width="120" height="340" rx="30" fill="none" stroke="#3a4468" stroke-width="2"/>
+        <rect x="70" y="60" width="100" height="120" rx="10" fill="none" stroke="#3a4468" stroke-width="1"/>
+        <!-- four upright/wheel positions -->
+        <circle id="dot-front_left"  class="upright-dot" cx="45"  cy="70"  r="16" fill="#2ecc71"/>
+        <circle id="dot-front_right" class="upright-dot" cx="195" cy="70"  r="16" fill="#2ecc71"/>
+        <circle id="dot-rear_left"   class="upright-dot" cx="45"  cy="310" r="16" fill="#2ecc71"/>
+        <circle id="dot-rear_right"  class="upright-dot" cx="195" cy="310" r="16" fill="#2ecc71"/>
+        <text class="upright-label" x="45"  y="45">FL</text>
+        <text class="upright-label" x="195" y="45">FR</text>
+        <text class="upright-label" x="45"  y="335">RL</text>
+        <text class="upright-label" x="195" y="335">RR</text>
+      </svg>
+    </div>
+  </div>
+
+  <div class="panel" style="margin-top:20px">
+    <h2>Recent Events</h2>
+    <div id="historyWrap">
+      <table>
+        <thead>
+          <tr><th>Time</th><th>Upright</th><th>Fx / Fy / Fz (N)</th><th>Stress (MPa)</th><th>Disp (mm)</th><th>Priority</th></tr>
+        </thead>
+        <tbody id="historyBody"></tbody>
+      </table>
+      <div id="historyEmpty" class="empty" style="display:none">No events yet.</div>
+    </div>
+  </div>
+
+  <div class="panel demo-panel">
+    <h2>Demo Controls — Simulate Impact (fallback)</h2>
+    <div class="demo-row">
+      <span class="lbl">Corner:</span>
+      <select id="cornerSelect">
+        <option value="front_left">Front Left</option>
+        <option value="front_right" selected>Front Right</option>
+        <option value="rear_left">Rear Left</option>
+        <option value="rear_right">Rear Right</option>
+      </select>
+      <button class="demo-btn mild"     onclick="simulateImpact('mild')">Mild tap</button>
+      <button class="demo-btn moderate" onclick="simulateImpact('moderate')">Moderate hit</button>
+      <button class="demo-btn severe"   onclick="simulateImpact('severe')">Severe impact</button>
+    </div>
+    <div class="demo-hint">
+      Use these if the Arduino isn't cooperating on stage — each button posts a
+      preset impact straight to the backend, exactly as the real detector would.
+      Same pipeline, same output. (Re-check these still show 3 different colors
+      after retraining on Person 1's real FEA data.)
+    </div>
+  </div>
+
+<script>
+  // ---- Config: point this at wherever backend/app.py is running ----
+  const BACKEND_URL = "http://localhost:8000";
+  const POLL_MS = 1500;
+
+  const priorityColor = { LOW: "#2ecc71", MODERATE: "#f5a623", HIGH: "#e74c3c" };
+
+  function fmtTime(iso) {
+    try { return new Date(iso).toLocaleTimeString(); } catch { return iso; }
+  }
+
+  function resetUprightDots() {
+    ["front_left","front_right","rear_left","rear_right"].forEach(id => {
+      const el = document.getElementById("dot-" + id);
+      if (el) { el.setAttribute("fill", "#3a4468"); el.setAttribute("r", 16); }
+    });
+  }
+
+  function highlightUpright(uprightId, priority) {
+    resetUprightDots();
+    const el = document.getElementById("dot-" + uprightId);
+    if (el) {
+      el.setAttribute("fill", priorityColor[priority] || "#3a4468");
+      el.setAttribute("r", priority === "HIGH" ? 20 : 16);
+    }
+  }
+
+  function renderLatest(evt) {
+    const empty = document.getElementById("latestEmpty");
+    const content = document.getElementById("latestContent");
+    if (!evt || evt.message) {
+      empty.style.display = "block";
+      content.style.display = "none";
+      resetUprightDots();
+      return;
+    }
+    empty.style.display = "none";
+    content.style.display = "block";
+
+    const badge = document.getElementById("priorityBadge");
+    badge.textContent = evt.priority;
+    badge.className = "priority-badge priority-" + evt.priority;
+
+    document.getElementById("stressVal").textContent =
+      evt.predicted_von_mises_stress_MPa + " MPa";
+    document.getElementById("dispVal").textContent =
+      evt.predicted_max_displacement_mm + " mm";
+    document.getElementById("fracVal").textContent =
+      (evt.fraction_of_yield * 100).toFixed(1) + "% of yield";
+    document.getElementById("uprightVal").textContent = evt.upright_id;
+
+    document.getElementById("metaInfo").innerHTML =
+      `Detected ${fmtTime(evt.timestamp)} &middot; source: ${evt.source} &middot; ` +
+      `input Fx=${evt.input.Fx.toFixed(0)}N Fy=${evt.input.Fy.toFixed(0)}N Fz=${evt.input.Fz.toFixed(0)}N ` +
+      `&middot; model: ${evt.model_type}`;
+
+    const warn = document.getElementById("envelopeWarn");
+    if (evt.in_envelope === false) {
+      warn.style.display = "block";
+      warn.innerHTML = "&#9888; <strong>Outside trained envelope</strong> — this "
+        + "impact is larger than any case the model was trained on, so the "
+        + "prediction is an extrapolation. Treat as HIGH and inspect directly.<br>"
+        + "<span style='opacity:.85'>" + (evt.extrapolation_warning || "") + "</span>";
+    } else {
+      warn.style.display = "none";
+    }
+
+    highlightUpright(evt.upright_id, evt.priority);
+  }
+
+  function renderHistory(events) {
+    const body = document.getElementById("historyBody");
+    const empty = document.getElementById("historyEmpty");
+    if (!events || events.length === 0) {
+      body.innerHTML = "";
+      empty.style.display = "block";
+      return;
+    }
+    empty.style.display = "none";
+    body.innerHTML = events.slice().reverse().map(evt => `
+      <tr class="row-${evt.priority}">
+        <td>${fmtTime(evt.timestamp)}</td>
+        <td>${evt.upright_id}</td>
+        <td>${evt.input.Fx.toFixed(0)} / ${evt.input.Fy.toFixed(0)} / ${evt.input.Fz.toFixed(0)}</td>
+        <td>${evt.predicted_von_mises_stress_MPa}</td>
+        <td>${evt.predicted_max_displacement_mm}</td>
+        <td style="color:${priorityColor[evt.priority]}">${evt.priority}</td>
+      </tr>
+    `).join("");
+  }
+
+  function setConnStatus(ok) {
+    const el = document.getElementById("connStatus");
+    el.innerHTML = ok
+      ? '<span class="dot ok"></span>connected to backend'
+      : '<span class="dot bad"></span>cannot reach backend at ' + BACKEND_URL;
+  }
+
+  async function poll() {
+    try {
+      const [latestRes, historyRes] = await Promise.all([
+        fetch(BACKEND_URL + "/latest"),
+        fetch(BACKEND_URL + "/history?limit=25"),
+      ]);
+      const latest = await latestRes.json();
+      const history = await historyRes.json();
+      setConnStatus(true);
+      renderLatest(latest);
+      renderHistory(history.events);
+    } catch (e) {
+      setConnStatus(false);
+    }
+  }
+
+  // ---- Demo fallback: preset impacts that reliably produce each priority ----
+  // Force vectors (N) tuned against the current model to land LOW/MOD/HIGH.
+  const DEMO_PRESETS = {
+    mild:     { Fx: 900,  Fy: 500,   Fz: -700 },
+    moderate: { Fx: 3400, Fy: -2000, Fz: 4300 },
+    severe:   { Fx: 7000, Fy: 5000,  Fz: -6500 },
+  };
+
+  async function simulateImpact(severity) {
+    const preset = DEMO_PRESETS[severity];
+    const upright = document.getElementById("cornerSelect").value;
+    try {
+      await fetch(BACKEND_URL + "/impact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...preset, upright_id: upright, source: "dashboard_demo" }),
+      });
+      poll();  // refresh immediately so the badge/car update without waiting for the next poll
+    } catch (e) {
+      setConnStatus(false);
+    }
+  }
+
+  poll();
+  setInterval(poll, POLL_MS);
+</script>
+</body>
+</html>

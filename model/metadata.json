@@ -1,0 +1,59 @@
+{
+  "model_type": "random_forest",
+  "n_training_rows": 400,
+  "feature_names": [
+    "Fx",
+    "Fy",
+    "Fz",
+    "abs_Fx",
+    "abs_Fy",
+    "abs_Fz",
+    "Fx2",
+    "Fy2",
+    "Fz2",
+    "magnitude"
+  ],
+  "targets": [
+    "von_mises_stress_MPa",
+    "max_displacement_mm"
+  ],
+  "axis_convention": {
+    "Fx": "longitudinal",
+    "Fy": "lateral",
+    "Fz": "vertical"
+  },
+  "material": {
+    "material_name": "Al 7075-T6 (PLACEHOLDER - Person 1 to confirm actual SOLIDWORKS material)",
+    "yield_strength_MPa": 503.0,
+    "elastic_modulus_GPa": 71.7
+  },
+  "priority_thresholds": {
+    "moderate_at_fraction_of_yield": 0.4,
+    "high_at_fraction_of_yield": 0.75,
+    "moderate_stress_MPa": 201.2,
+    "high_stress_MPa": 377.25
+  },
+  "training_envelope": {
+    "Fx": [
+      -5957.45,
+      5998.89
+    ],
+    "Fy": [
+      -5965.97,
+      5970.45
+    ],
+    "Fz": [
+      -5937.82,
+      5977.81
+    ],
+    "magnitude_max": 9439.388682716693
+  },
+  "metrics": {
+    "stress_MAE_MPa": 10.000339121890761,
+    "stress_MAPE_pct": 4.518107382981455,
+    "stress_R2": 0.9682456432431343,
+    "displacement_MAE_mm": 0.03240810305789635,
+    "displacement_MAPE_pct": 4.4202362199077765,
+    "displacement_R2": 0.9643390077219616
+  }
+}

@@ -1,0 +1,25 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# --- virtual environments ---
+.venv/
+venv/
+env/
+
+# --- trained model artifact (regenerate with `python model/train.py`) ---
+# The binary pickle is sklearn-version-specific, so we don't commit it.
+# metadata.json IS committed so GitHub/dashboard shows model context.
+model/surrogate_model.joblib
+
+# --- generated validation artifacts ---
+model/validation_stress.png
+model/validation_displacement.png
+
+# --- OS / editor cruft ---
+.DS_Store
+.idea/
+.vscode/
+*.swp
