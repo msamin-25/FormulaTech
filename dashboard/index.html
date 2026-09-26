@@ -2,174 +2,318 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>ImpactIQ Dashboard</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ImpactIQ</title>
 <style>
   :root {
-    --bg: #0f1420;
-    --panel: #171d2e;
-    --panel-border: #2a3350;
-    --text: #e8ecf6;
+    --bg: #0a0e17;
+    --bg2: #0e1524;
+    --panel: rgba(23, 29, 46, 0.72);
+    --panel-solid: #141a2b;
+    --panel-border: rgba(120, 140, 190, 0.16);
+    --text: #eef2fb;
     --muted: #8a93ad;
-    --low: #2ecc71;
-    --moderate: #f5a623;
-    --high: #e74c3c;
+    --faint: #59627e;
+    --low: #2ee6a0;
+    --moderate: #f5b13a;
+    --high: #ff5470;
+    --accent: #5b8cff;
+    --shadow: 0 18px 50px rgba(0,0,0,.45);
   }
   * { box-sizing: border-box; }
+  html, body { height: 100%; }
   body {
     margin: 0;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    background: var(--bg);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
     color: var(--text);
-    padding: 24px;
+    background:
+      radial-gradient(1100px 600px at 15% -10%, rgba(91,140,255,.18), transparent 60%),
+      radial-gradient(900px 500px at 100% 0%, rgba(46,230,160,.10), transparent 55%),
+      linear-gradient(180deg, var(--bg2), var(--bg));
+    background-attachment: fixed;
+    min-height: 100%;
+    padding: 20px clamp(16px, 4vw, 40px) 48px;
+    -webkit-font-smoothing: antialiased;
   }
-  h1 { font-size: 20px; margin: 0 0 4px; }
-  .sub { color: var(--muted); font-size: 13px; margin-bottom: 20px; }
+  .mono { font-family: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace; }
+
+  /* ---------- Header ---------- */
+  header {
+    display: flex; align-items: center; gap: 16px;
+    flex-wrap: wrap;
+    padding-bottom: 18px; margin-bottom: 22px;
+    border-bottom: 1px solid var(--panel-border);
+  }
+  .brand { display: flex; align-items: center; gap: 13px; }
+  .logo {
+    width: 42px; height: 42px; border-radius: 12px; flex: 0 0 auto;
+    background: linear-gradient(135deg, var(--accent), #7b5bff);
+    display: grid; place-items: center;
+    box-shadow: 0 8px 22px rgba(91,140,255,.4);
+  }
+  .logo svg { width: 24px; height: 24px; }
+  .brand h1 { font-size: 20px; margin: 0; letter-spacing: -.01em; font-weight: 700; }
+  .brand .tag { font-size: 12px; color: var(--muted); margin-top: 1px; }
+  .brand .tag b { color: var(--accent); font-weight: 600; }
+
+  .chips { display: flex; gap: 8px; flex-wrap: wrap; margin-left: auto; align-items: center; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 7px;
+    background: rgba(255,255,255,.04); border: 1px solid var(--panel-border);
+    border-radius: 999px; padding: 6px 12px; font-size: 12px; color: var(--muted);
+    white-space: nowrap;
+  }
+  .chip b { color: var(--text); font-weight: 600; }
+  .chip .k { color: var(--faint); }
+  .status-pill { transition: all .3s; }
+  .status-pill.ok { color: var(--low); border-color: rgba(46,230,160,.35); background: rgba(46,230,160,.08); }
+  .status-pill.bad { color: var(--high); border-color: rgba(255,84,112,.35); background: rgba(255,84,112,.08); }
+  .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+  .dot.ok { background: var(--low); box-shadow: 0 0 0 0 rgba(46,230,160,.6); animation: livedot 1.8s infinite; }
+  .dot.bad { background: var(--high); }
+  @keyframes livedot {
+    0% { box-shadow: 0 0 0 0 rgba(46,230,160,.55); }
+    70% { box-shadow: 0 0 0 7px rgba(46,230,160,0); }
+    100% { box-shadow: 0 0 0 0 rgba(46,230,160,0); }
+  }
+
+  /* ---------- Layout ---------- */
   .grid {
     display: grid;
-    grid-template-columns: 1.1fr 1fr;
-    gap: 20px;
+    grid-template-columns: 1.35fr 1fr;
+    gap: 18px;
+    align-items: stretch;
   }
-  @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+  @media (max-width: 960px) { .grid { grid-template-columns: 1fr; } }
+
   .panel {
     background: var(--panel);
     border: 1px solid var(--panel-border);
-    border-radius: 12px;
-    padding: 20px;
+    border-radius: 18px;
+    padding: 22px;
+    backdrop-filter: blur(10px);
+    box-shadow: var(--shadow);
+    position: relative;
+    overflow: hidden;
   }
-  .panel h2 { font-size: 14px; text-transform: uppercase; letter-spacing: .05em;
-              color: var(--muted); margin: 0 0 16px; }
-
-  .priority-badge {
-    display: inline-block;
-    font-size: 28px;
-    font-weight: 700;
-    padding: 10px 22px;
-    border-radius: 10px;
-    letter-spacing: .04em;
+  .panel h2 {
+    font-size: 11px; text-transform: uppercase; letter-spacing: .12em;
+    color: var(--muted); margin: 0 0 16px; font-weight: 600;
   }
-  .priority-LOW { background: rgba(46,204,113,.15); color: var(--low); border: 1px solid var(--low); }
-  .priority-MODERATE { background: rgba(245,166,35,.15); color: var(--moderate); border: 1px solid var(--moderate); }
-  .priority-HIGH { background: rgba(231,76,60,.15); color: var(--high); border: 1px solid var(--high); animation: pulse 1.2s infinite; }
-  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .55; } }
+  .panel h2 .live { color: var(--low); margin-left: 6px; }
 
-  .metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 20px; }
-  .metric { background: rgba(255,255,255,.03); border-radius: 8px; padding: 12px 14px; }
-  .metric .label { color: var(--muted); font-size: 12px; }
-  .metric .value { font-size: 22px; font-weight: 600; margin-top: 2px; }
+  /* hero verdict panel gets a tinted top edge that reflects priority */
+  #heroPanel::before {
+    content: ""; position: absolute; inset: 0 0 auto 0; height: 3px;
+    background: var(--edge, var(--accent)); opacity: .9; transition: background .4s;
+  }
+  #heroPanel.flash { animation: flash .7s ease-out; }
+  @keyframes flash {
+    0% { box-shadow: 0 0 0 0 var(--edge); }
+    100% { box-shadow: var(--shadow); }
+  }
 
-  .meta { margin-top: 16px; font-size: 13px; color: var(--muted); line-height: 1.6; }
+  /* ---------- Hero verdict ---------- */
+  .hero { display: grid; grid-template-columns: auto 1fr; gap: 24px; align-items: center; }
+  @media (max-width: 520px) { .hero { grid-template-columns: 1fr; text-align: center; justify-items: center; } }
+
+  .gauge-wrap { position: relative; width: 210px; height: 168px; }
+  .gauge-center {
+    position: absolute; inset: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; padding-top: 14px;
+  }
+  .gauge-pct { font-size: 40px; font-weight: 700; line-height: 1; letter-spacing: -.02em; }
+  .gauge-cap { font-size: 10.5px; color: var(--muted); text-transform: uppercase; letter-spacing: .1em; margin-top: 5px; }
+  .gauge-scale { position: absolute; bottom: 6px; width: 100%; display: flex; justify-content: space-between; padding: 0 12px; font-size: 10px; color: var(--faint); }
+
+  .verdict .label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .1em; }
+  .verdict .word {
+    font-size: 52px; font-weight: 800; line-height: 1; margin: 6px 0 8px; letter-spacing: -.02em;
+    transition: color .35s; text-shadow: 0 0 30px var(--glow, transparent);
+  }
+  .verdict .action { font-size: 15px; color: var(--text); font-weight: 500; }
+  .verdict .action .sub { color: var(--muted); font-weight: 400; }
+  .prLOW { color: var(--low); } .prMODERATE { color: var(--moderate); } .prHIGH { color: var(--high); }
+
+  .empty-hero { text-align: center; padding: 30px 10px; color: var(--muted); }
+  .empty-hero .big { font-size: 17px; color: var(--text); margin-bottom: 6px; }
+  .pulse-ring {
+    width: 54px; height: 54px; margin: 0 auto 14px; border-radius: 50%;
+    border: 2px solid var(--accent); animation: waiting 1.6s ease-out infinite;
+  }
+  @keyframes waiting { 0% { transform: scale(.6); opacity: 1; } 100% { transform: scale(1.3); opacity: 0; } }
+
+  /* ---------- Metrics ---------- */
+  .metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 22px; }
+  @media (max-width: 620px) { .metrics { grid-template-columns: repeat(2, 1fr); } }
+  .metric {
+    background: rgba(255,255,255,.035); border: 1px solid var(--panel-border);
+    border-radius: 12px; padding: 13px 14px;
+  }
+  .metric .label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .06em; }
+  .metric .value { font-size: 24px; font-weight: 700; margin-top: 4px; letter-spacing: -.01em; }
+  .metric .value small { font-size: 13px; font-weight: 500; color: var(--muted); margin-left: 2px; }
+
+  .meta { margin-top: 16px; font-size: 12.5px; color: var(--muted); line-height: 1.7; }
+  .meta code { color: var(--text); background: rgba(255,255,255,.05); padding: 1px 6px; border-radius: 5px; font-size: 12px; }
 
   .envelope-warn {
-    margin-top: 14px; padding: 10px 12px; border-radius: 8px; font-size: 12.5px;
-    background: rgba(245,166,35,.12); border: 1px solid var(--moderate);
-    color: var(--moderate); line-height: 1.5;
+    margin-top: 16px; padding: 12px 14px; border-radius: 12px; font-size: 12.5px;
+    background: rgba(255,84,112,.10); border: 1px solid rgba(255,84,112,.4);
+    color: #ffb3c1; line-height: 1.55; display: none;
   }
+  .envelope-warn b { color: var(--high); }
 
-  svg { width: 100%; height: auto; }
-  .upright-dot { transition: fill .3s, r .3s; cursor: default; }
-  .upright-label { font-size: 11px; fill: var(--muted); text-anchor: middle; }
+  /* ---------- 3D car ---------- */
+  #car3d { width: 100%; height: 300px; border-radius: 12px;
+    background: radial-gradient(120% 90% at 50% 20%, rgba(91,140,255,.10), transparent 70%);
+    touch-action: none; }
+  #car3d canvas { display: block; border-radius: 12px; }
 
+  /* ---------- Waveform ---------- */
+  .wave-box { margin-top: 16px; }
+  .wave-box .cap { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); margin-bottom: 6px; }
+  canvas#wave { width: 100%; height: 90px; display: block; border-radius: 10px;
+    background: rgba(0,0,0,.22); border: 1px solid var(--panel-border); }
+
+  /* ---------- History ---------- */
   table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--panel-border); }
-  th { color: var(--muted); font-weight: 500; font-size: 11px; text-transform: uppercase; }
-  tr.row-HIGH td:first-child { border-left: 3px solid var(--high); }
-  tr.row-MODERATE td:first-child { border-left: 3px solid var(--moderate); }
-  tr.row-LOW td:first-child { border-left: 3px solid var(--low); }
+  th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--panel-border); }
+  th { color: var(--faint); font-weight: 600; font-size: 10.5px; text-transform: uppercase; letter-spacing: .06em; }
+  tbody tr { transition: background .2s; }
+  tbody tr:hover { background: rgba(255,255,255,.03); }
+  tr.row-HIGH td:first-child { box-shadow: inset 3px 0 0 var(--high); }
+  tr.row-MODERATE td:first-child { box-shadow: inset 3px 0 0 var(--moderate); }
+  tr.row-LOW td:first-child { box-shadow: inset 3px 0 0 var(--low); }
+  .pri-tag { font-weight: 700; font-size: 12px; }
+  .empty { color: var(--muted); font-size: 14px; padding: 22px 0; text-align: center; }
 
-  .empty { color: var(--muted); font-size: 14px; padding: 20px 0; text-align: center; }
-  #connStatus { font-size: 12px; }
-  .dot { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:6px; }
-  .dot.ok { background: var(--low); }
-  .dot.bad { background: var(--high); }
-
-  /* Demo control panel — the on-stage fallback if the Arduino isn't cooperating */
-  .demo-panel { margin-top: 20px; border-style: dashed; }
+  /* ---------- Demo controls ---------- */
+  .demo-panel { margin-top: 18px; border-style: dashed; }
   .demo-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
-  .demo-row .lbl { color: var(--muted); font-size: 13px; margin-right: 4px; }
+  .demo-row .lbl { color: var(--muted); font-size: 13px; }
   select, .demo-btn {
     background: rgba(255,255,255,.05); color: var(--text);
-    border: 1px solid var(--panel-border); border-radius: 8px;
-    padding: 8px 14px; font-size: 14px; cursor: pointer; font-family: inherit;
+    border: 1px solid var(--panel-border); border-radius: 10px;
+    padding: 9px 15px; font-size: 14px; cursor: pointer; font-family: inherit;
+    transition: all .18s;
   }
-  .demo-btn:hover { background: rgba(255,255,255,.12); }
-  .demo-btn.mild:hover     { border-color: var(--low); color: var(--low); }
-  .demo-btn.moderate:hover { border-color: var(--moderate); color: var(--moderate); }
-  .demo-btn.severe:hover   { border-color: var(--high); color: var(--high); }
-  .demo-hint { color: var(--muted); font-size: 12px; margin-top: 10px; }
+  select:hover { border-color: var(--accent); }
+  .demo-btn { font-weight: 600; }
+  .demo-btn:active { transform: translateY(1px); }
+  .demo-btn.mild:hover     { border-color: var(--low); color: var(--low); box-shadow: 0 0 18px rgba(46,230,160,.25); }
+  .demo-btn.moderate:hover { border-color: var(--moderate); color: var(--moderate); box-shadow: 0 0 18px rgba(245,177,58,.25); }
+  .demo-btn.severe:hover   { border-color: var(--high); color: var(--high); box-shadow: 0 0 18px rgba(255,84,112,.25); }
+  .demo-hint { color: var(--faint); font-size: 11.5px; margin-top: 12px; line-height: 1.55; }
+
+  .full { margin-top: 18px; }
 </style>
 </head>
 <body>
-  <h1>ImpactIQ — Structural Triage Dashboard</h1>
-  <div class="sub">
-    Live post-impact inspection priority for race-car uprights &middot;
-    <span id="connStatus"><span class="dot bad"></span>connecting to backend...</span>
-  </div>
+
+  <header>
+    <div class="brand">
+      <div class="logo">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M13 2 4 14h6l-1 8 9-12h-6l1-8z" fill="#fff"/></svg>
+      </div>
+      <div>
+        <h1>ImpactIQ</h1>
+        <div class="tag">Post-impact structural triage &middot; <b>AI surrogate</b> trained on SOLIDWORKS FEA</div>
+      </div>
+    </div>
+    <div class="chips" id="chips">
+      <span class="chip status-pill bad" id="connStatus"><span class="dot bad"></span>connecting…</span>
+    </div>
+  </header>
 
   <div class="grid">
-    <div class="panel">
-      <h2>Latest Impact</h2>
-      <div id="latestEmpty" class="empty">No impacts recorded yet. Waiting for the first event...</div>
-      <div id="latestContent" style="display:none">
-        <span id="priorityBadge" class="priority-badge priority-LOW">LOW</span>
+    <!-- HERO -->
+    <div class="panel" id="heroPanel">
+      <h2>Latest Impact <span class="live" id="liveTag" style="display:none">● LIVE</span></h2>
+
+      <div id="emptyHero" class="empty-hero">
+        <div class="pulse-ring"></div>
+        <div class="big">Awaiting first impact</div>
+        <div>Hit the IMU, or use the demo controls below.</div>
+      </div>
+
+      <div id="heroContent" style="display:none">
+        <div class="hero">
+          <!-- Gauge -->
+          <div class="gauge-wrap">
+            <svg viewBox="0 0 210 168" style="width:210px;height:168px">
+              <polyline id="gaugeTrack" fill="none" stroke="rgba(255,255,255,.08)" stroke-width="14" stroke-linecap="round"/>
+              <polyline id="gaugeFill"  fill="none" stroke="var(--accent)" stroke-width="14" stroke-linecap="round"/>
+              <g id="gaugeTicks" stroke="var(--bg)" stroke-width="2.5"></g>
+            </svg>
+            <div class="gauge-center">
+              <div class="gauge-pct mono" id="gaugePct">0<small style="font-size:20px">%</small></div>
+              <div class="gauge-cap">of yield strength</div>
+            </div>
+            <div class="gauge-scale"><span>0</span><span>yield</span></div>
+          </div>
+
+          <!-- Verdict -->
+          <div class="verdict">
+            <div class="label">Inspection priority</div>
+            <div class="word" id="verdictWord">—</div>
+            <div class="action" id="verdictAction"></div>
+          </div>
+        </div>
+
         <div class="metrics">
           <div class="metric">
-            <div class="label">Predicted Stress</div>
-            <div class="value" id="stressVal">—</div>
+            <div class="label">von Mises stress</div>
+            <div class="value mono"><span id="stressVal">0</span><small>MPa</small></div>
           </div>
           <div class="metric">
-            <div class="label">Predicted Displacement</div>
-            <div class="value" id="dispVal">—</div>
+            <div class="label">Displacement</div>
+            <div class="value mono"><span id="dispVal">0</span><small>mm</small></div>
           </div>
           <div class="metric">
-            <div class="label">Fraction of Yield</div>
-            <div class="value" id="fracVal">—</div>
+            <div class="label">Impact force |F|</div>
+            <div class="value mono"><span id="forceVal">0</span><small>N</small></div>
           </div>
           <div class="metric">
             <div class="label">Upright</div>
-            <div class="value" id="uprightVal">—</div>
+            <div class="value" id="uprightVal" style="font-size:20px">—</div>
           </div>
         </div>
+
         <div class="meta" id="metaInfo"></div>
-        <div class="envelope-warn" id="envelopeWarn" style="display:none"></div>
+        <div class="envelope-warn" id="envelopeWarn"></div>
       </div>
     </div>
 
+    <!-- CAR + WAVE -->
     <div class="panel">
-      <h2>Affected Upright</h2>
-      <svg id="carSvg" viewBox="0 0 240 380">
-        <!-- simple top-down car outline -->
-        <rect x="60" y="20" width="120" height="340" rx="30" fill="none" stroke="#3a4468" stroke-width="2"/>
-        <rect x="70" y="60" width="100" height="120" rx="10" fill="none" stroke="#3a4468" stroke-width="1"/>
-        <!-- four upright/wheel positions -->
-        <circle id="dot-front_left"  class="upright-dot" cx="45"  cy="70"  r="16" fill="#2ecc71"/>
-        <circle id="dot-front_right" class="upright-dot" cx="195" cy="70"  r="16" fill="#2ecc71"/>
-        <circle id="dot-rear_left"   class="upright-dot" cx="45"  cy="310" r="16" fill="#2ecc71"/>
-        <circle id="dot-rear_right"  class="upright-dot" cx="195" cy="310" r="16" fill="#2ecc71"/>
-        <text class="upright-label" x="45"  y="45">FL</text>
-        <text class="upright-label" x="195" y="45">FR</text>
-        <text class="upright-label" x="45"  y="335">RL</text>
-        <text class="upright-label" x="195" y="335">RR</text>
-      </svg>
+      <h2>Affected Upright <span style="color:var(--faint);text-transform:none;letter-spacing:0;font-weight:400">· drag to rotate</span></h2>
+      <div id="car3d"></div>
+
+      <div class="wave-box">
+        <div class="cap"><span>Impact signature</span><span id="waveLabel">idle</span></div>
+        <canvas id="wave"></canvas>
+      </div>
     </div>
   </div>
 
-  <div class="panel" style="margin-top:20px">
+  <!-- HISTORY -->
+  <div class="panel full">
     <h2>Recent Events</h2>
-    <div id="historyWrap">
-      <table>
-        <thead>
-          <tr><th>Time</th><th>Upright</th><th>Fx / Fy / Fz (N)</th><th>Stress (MPa)</th><th>Disp (mm)</th><th>Priority</th></tr>
-        </thead>
-        <tbody id="historyBody"></tbody>
-      </table>
-      <div id="historyEmpty" class="empty" style="display:none">No events yet.</div>
-    </div>
+    <table>
+      <thead>
+        <tr><th>Time</th><th>Upright</th><th>Fx / Fy / Fz (N)</th><th>Stress (MPa)</th><th>Disp (mm)</th><th>Priority</th></tr>
+      </thead>
+      <tbody id="historyBody"></tbody>
+    </table>
+    <div id="historyEmpty" class="empty">No events yet.</div>
   </div>
 
-  <div class="panel demo-panel">
-    <h2>Demo Controls — Simulate Impact (fallback)</h2>
+  <!-- DEMO -->
+  <div class="panel demo-panel full">
+    <h2>Demo Controls — Simulate Impact</h2>
     <div class="demo-row">
-      <span class="lbl">Corner:</span>
+      <span class="lbl">Corner</span>
       <select id="cornerSelect">
         <option value="front_left">Front Left</option>
         <option value="front_right" selected>Front Right</option>
@@ -181,150 +325,273 @@
       <button class="demo-btn severe"   onclick="simulateImpact('severe')">Severe impact</button>
     </div>
     <div class="demo-hint">
-      Use these if the Arduino isn't cooperating on stage — each button posts a
-      preset impact straight to the backend, exactly as the real detector would.
-      Same pipeline, same output. (Re-check these still show 3 different colors
-      after retraining on Person 1's real FEA data.)
+      On-stage fallback if the Arduino misbehaves — each button POSTs a preset impact straight to the backend,
+      running the exact same model pipeline as a real hit. Re-check these still land LOW / MODERATE / HIGH after
+      retraining on Person 1's real FEA data.
     </div>
   </div>
 
+<script src="vendor/three.min.js"></script>
+<script src="car3d.js"></script>
 <script>
-  // ---- Config: point this at wherever backend/app.py is running ----
+  // ================= CONFIG (unchanged contract) =================
   const BACKEND_URL = "http://localhost:8000";
   const POLL_MS = 1500;
-
-  const priorityColor = { LOW: "#2ecc71", MODERATE: "#f5a623", HIGH: "#e74c3c" };
-
-  function fmtTime(iso) {
-    try { return new Date(iso).toLocaleTimeString(); } catch { return iso; }
-  }
-
-  function resetUprightDots() {
-    ["front_left","front_right","rear_left","rear_right"].forEach(id => {
-      const el = document.getElementById("dot-" + id);
-      if (el) { el.setAttribute("fill", "#3a4468"); el.setAttribute("r", 16); }
-    });
-  }
-
-  function highlightUpright(uprightId, priority) {
-    resetUprightDots();
-    const el = document.getElementById("dot-" + uprightId);
-    if (el) {
-      el.setAttribute("fill", priorityColor[priority] || "#3a4468");
-      el.setAttribute("r", priority === "HIGH" ? 20 : 16);
-    }
-  }
-
-  function renderLatest(evt) {
-    const empty = document.getElementById("latestEmpty");
-    const content = document.getElementById("latestContent");
-    if (!evt || evt.message) {
-      empty.style.display = "block";
-      content.style.display = "none";
-      resetUprightDots();
-      return;
-    }
-    empty.style.display = "none";
-    content.style.display = "block";
-
-    const badge = document.getElementById("priorityBadge");
-    badge.textContent = evt.priority;
-    badge.className = "priority-badge priority-" + evt.priority;
-
-    document.getElementById("stressVal").textContent =
-      evt.predicted_von_mises_stress_MPa + " MPa";
-    document.getElementById("dispVal").textContent =
-      evt.predicted_max_displacement_mm + " mm";
-    document.getElementById("fracVal").textContent =
-      (evt.fraction_of_yield * 100).toFixed(1) + "% of yield";
-    document.getElementById("uprightVal").textContent = evt.upright_id;
-
-    document.getElementById("metaInfo").innerHTML =
-      `Detected ${fmtTime(evt.timestamp)} &middot; source: ${evt.source} &middot; ` +
-      `input Fx=${evt.input.Fx.toFixed(0)}N Fy=${evt.input.Fy.toFixed(0)}N Fz=${evt.input.Fz.toFixed(0)}N ` +
-      `&middot; model: ${evt.model_type}`;
-
-    const warn = document.getElementById("envelopeWarn");
-    if (evt.in_envelope === false) {
-      warn.style.display = "block";
-      warn.innerHTML = "&#9888; <strong>Outside trained envelope</strong> — this "
-        + "impact is larger than any case the model was trained on, so the "
-        + "prediction is an extrapolation. Treat as HIGH and inspect directly.<br>"
-        + "<span style='opacity:.85'>" + (evt.extrapolation_warning || "") + "</span>";
-    } else {
-      warn.style.display = "none";
-    }
-
-    highlightUpright(evt.upright_id, evt.priority);
-  }
-
-  function renderHistory(events) {
-    const body = document.getElementById("historyBody");
-    const empty = document.getElementById("historyEmpty");
-    if (!events || events.length === 0) {
-      body.innerHTML = "";
-      empty.style.display = "block";
-      return;
-    }
-    empty.style.display = "none";
-    body.innerHTML = events.slice().reverse().map(evt => `
-      <tr class="row-${evt.priority}">
-        <td>${fmtTime(evt.timestamp)}</td>
-        <td>${evt.upright_id}</td>
-        <td>${evt.input.Fx.toFixed(0)} / ${evt.input.Fy.toFixed(0)} / ${evt.input.Fz.toFixed(0)}</td>
-        <td>${evt.predicted_von_mises_stress_MPa}</td>
-        <td>${evt.predicted_max_displacement_mm}</td>
-        <td style="color:${priorityColor[evt.priority]}">${evt.priority}</td>
-      </tr>
-    `).join("");
-  }
-
-  function setConnStatus(ok) {
-    const el = document.getElementById("connStatus");
-    el.innerHTML = ok
-      ? '<span class="dot ok"></span>connected to backend'
-      : '<span class="dot bad"></span>cannot reach backend at ' + BACKEND_URL;
-  }
-
-  async function poll() {
-    try {
-      const [latestRes, historyRes] = await Promise.all([
-        fetch(BACKEND_URL + "/latest"),
-        fetch(BACKEND_URL + "/history?limit=25"),
-      ]);
-      const latest = await latestRes.json();
-      const history = await historyRes.json();
-      setConnStatus(true);
-      renderLatest(latest);
-      renderHistory(history.events);
-    } catch (e) {
-      setConnStatus(false);
-    }
-  }
-
-  // ---- Demo fallback: preset impacts that reliably produce each priority ----
-  // Force vectors (N) tuned against the current model to land LOW/MOD/HIGH.
+  const priorityColor = { LOW: "#2ee6a0", MODERATE: "#f5b13a", HIGH: "#ff5470" };
+  const priorityGlow  = { LOW: "rgba(46,230,160,.5)", MODERATE: "rgba(245,177,58,.5)", HIGH: "rgba(255,84,112,.55)" };
+  const actionText = {
+    LOW:      ["Cleared to continue", "within safe margin — no inspection required"],
+    MODERATE: ["Inspect before next session", "elevated stress — check for damage"],
+    HIGH:     ["Do not run — inspect now", "approaching material yield"],
+  };
+  // Force vectors (N) tuned to reliably land each priority. (Duplicated in check_demo.py.)
   const DEMO_PRESETS = {
     mild:     { Fx: 900,  Fy: 500,   Fz: -700 },
     moderate: { Fx: 3400, Fy: -2000, Fz: 4300 },
     severe:   { Fx: 7000, Fy: 5000,  Fz: -6500 },
   };
 
-  async function simulateImpact(severity) {
-    const preset = DEMO_PRESETS[severity];
-    const upright = document.getElementById("cornerSelect").value;
+  // gauge full-scale = 125% of yield, so 100% sits below the top and there's a red headroom zone.
+  const GAUGE_MAX = 1.25;
+  const el = id => document.getElementById(id);
+
+  // ================= GAUGE =================
+  // 270° arc, from lower-left (225°) sweeping over the top to lower-right (-45°).
+  function gaugePolar(cx, cy, r, t) {           // t in [0,1] along the sweep
+    const deg = 225 - 270 * t;
+    const a = deg * Math.PI / 180;
+    return [cx + r * Math.cos(a), cy - r * Math.sin(a)];
+  }
+  function gaugePoints(t0, t1) {
+    const pts = [];
+    const N = 90;
+    for (let i = 0; i <= N; i++) {
+      const t = t0 + (t1 - t0) * (i / N);
+      pts.push(gaugePolar(105, 110, 82, t).map(v => v.toFixed(1)).join(","));
+    }
+    return pts.join(" ");
+  }
+  function initGauge() {
+    el("gaugeTrack").setAttribute("points", gaugePoints(0, 1));
+    // threshold ticks at 40% and 75% of yield (mapped onto the 0..125% scale)
+    const ticks = [0.40, 0.75].map(f => f / GAUGE_MAX);
+    el("gaugeTicks").innerHTML = ticks.map(t => {
+      const [x1, y1] = gaugePolar(105, 110, 74, t);
+      const [x2, y2] = gaugePolar(105, 110, 90, t);
+      return `<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}"/>`;
+    }).join("");
+  }
+  function setGauge(fraction, color) {
+    const t = Math.max(0, Math.min(1, fraction / GAUGE_MAX));
+    el("gaugeFill").setAttribute("points", gaugePoints(0, Math.max(0.001, t)));
+    el("gaugeFill").setAttribute("stroke", color);
+  }
+
+  // ================= animated count-up =================
+  function animateValue(node, to, decimals, dur = 650) {
+    const from = parseFloat(node.dataset.v || "0");
+    const start = performance.now();
+    node.dataset.v = to;
+    function step(now) {
+      const p = Math.min(1, (now - start) / dur);
+      const e = 1 - Math.pow(1 - p, 3);           // easeOutCubic
+      const val = from + (to - from) * e;
+      node.textContent = decimals === 0
+        ? Math.round(val).toLocaleString()
+        : val.toFixed(decimals);
+      if (p < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  }
+
+  // ================= 3D car (car3d.js / Three.js) =================
+  const hex = s => parseInt((s || "#5b8cff").replace("#", ""), 16);
+  function resetDots() { if (window.Car3D) Car3D.reset(); }
+  function highlightUpright(id, priority) {
+    if (window.Car3D) Car3D.highlight(id, hex(priorityColor[priority]), priority);
+  }
+
+  // ================= impact waveform (canvas, no libs) =================
+  const cvs = el("wave"), ctx = cvs.getContext("2d");
+  const NSAMP = 260;
+  let samples = new Array(NSAMP).fill(0);
+  let burst = { t: 999, amp: 0, freq: 9 };
+  let waveColor = "#5b8cff";
+  function sizeCanvas() {
+    const dpr = window.devicePixelRatio || 1;
+    cvs.width = cvs.clientWidth * dpr; cvs.height = cvs.clientHeight * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  function triggerBurst(magnitude, color) {
+    burst = { t: 0, amp: Math.max(0.22, Math.min(1, magnitude / 9000)), freq: 9 };
+    waveColor = color;
+    el("waveLabel").textContent = "impact detected";
+  }
+  function stepWave() {
+    samples.shift();
+    let v = (Math.random() - 0.5) * 0.03;         // idle noise
+    if (burst.amp > 0.002) {
+      v += burst.amp * Math.sin(burst.t * burst.freq) * Math.exp(-burst.t * 2.6);
+      burst.t += 0.07;
+      if (burst.t > 3.2) { burst.amp = 0; el("waveLabel").textContent = "idle"; }
+    }
+    samples.push(v);
+    drawWave();
+  }
+  function drawWave() {
+    const w = cvs.clientWidth, h = cvs.clientHeight, mid = h / 2;
+    ctx.clearRect(0, 0, w, h);
+    ctx.strokeStyle = "rgba(255,255,255,.06)";
+    ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(0, mid); ctx.lineTo(w, mid); ctx.stroke();
+    ctx.beginPath();
+    for (let i = 0; i < NSAMP; i++) {
+      const x = (i / (NSAMP - 1)) * w;
+      const y = mid - samples[i] * (h * 0.42);
+      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    }
+    ctx.strokeStyle = waveColor; ctx.lineWidth = 2;
+    ctx.shadowColor = waveColor; ctx.shadowBlur = 8;
+    ctx.stroke(); ctx.shadowBlur = 0;
+  }
+
+  // ================= rendering =================
+  function fmtTime(iso) { try { return new Date(iso).toLocaleTimeString(); } catch { return iso; } }
+  let lastKey = null;
+
+  function renderLatest(evt) {
+    const isEvent = evt && !evt.message;
+    el("emptyHero").style.display = isEvent ? "none" : "block";
+    el("heroContent").style.display = isEvent ? "block" : "none";
+    el("liveTag").style.display = isEvent ? "inline" : "none";
+    if (!isEvent) { resetDots(); lastKey = null; return; }
+
+    const p = evt.priority;
+    const color = priorityColor[p];
+    const isNew = evt.timestamp !== lastKey;
+    lastKey = evt.timestamp;
+
+    // verdict
+    const word = el("verdictWord");
+    word.textContent = p;
+    word.className = "word pr" + p;
+    word.style.setProperty("--glow", priorityGlow[p]);
+    el("verdictAction").innerHTML =
+      `${actionText[p][0]}<div class="sub">${actionText[p][1]}</div>`;
+
+    // hero edge + flash on a genuinely new event
+    const hero = el("heroPanel");
+    hero.style.setProperty("--edge", color);
+    if (isNew) { hero.classList.remove("flash"); void hero.offsetWidth; hero.classList.add("flash"); }
+
+    // gauge
+    const frac = evt.fraction_of_yield;
+    setGauge(frac, color);
+    const pctNode = el("gaugePct");
+    animateValue({ // wrap so we can keep the % suffix
+      dataset: pctNode.dataset,
+      set textContent(v) { pctNode.innerHTML = v + '<small style="font-size:20px">%</small>'; }
+    }, frac * 100, 0);
+
+    // metrics
+    animateValue(el("stressVal"), evt.predicted_von_mises_stress_MPa, 0);
+    animateValue(el("dispVal"), evt.predicted_max_displacement_mm, 3);
+    const mag = Math.hypot(evt.input.Fx, evt.input.Fy, evt.input.Fz);
+    animateValue(el("forceVal"), mag, 0);
+    el("uprightVal").textContent = evt.upright_id.replace("_", " ");
+
+    // meta
+    el("metaInfo").innerHTML =
+      `Detected ${fmtTime(evt.timestamp)} &middot; source <code>${evt.source}</code> &middot; ` +
+      `input <code>Fx ${evt.input.Fx.toFixed(0)} · Fy ${evt.input.Fy.toFixed(0)} · Fz ${evt.input.Fz.toFixed(0)} N</code> ` +
+      `&middot; model <code>${evt.model_type}</code>`;
+
+    // envelope
+    const warn = el("envelopeWarn");
+    if (evt.in_envelope === false) {
+      warn.style.display = "block";
+      warn.innerHTML = "&#9888; <b>Outside trained envelope</b> — this impact is larger than any case the "
+        + "model was trained on, so the prediction is an extrapolation. Treat as HIGH and inspect directly.<br>"
+        + "<span style='opacity:.85'>" + (evt.extrapolation_warning || "") + "</span>";
+    } else { warn.style.display = "none"; }
+
+    highlightUpright(evt.upright_id, p);
+    if (isNew) triggerBurst(mag, color);
+  }
+
+  function renderHistory(events) {
+    const body = el("historyBody"), empty = el("historyEmpty");
+    if (!events || !events.length) { body.innerHTML = ""; empty.style.display = "block"; return; }
+    empty.style.display = "none";
+    body.innerHTML = events.slice().reverse().map(e => `
+      <tr class="row-${e.priority}">
+        <td class="mono">${fmtTime(e.timestamp)}</td>
+        <td>${e.upright_id.replace("_"," ")}</td>
+        <td class="mono">${e.input.Fx.toFixed(0)} / ${e.input.Fy.toFixed(0)} / ${e.input.Fz.toFixed(0)}</td>
+        <td class="mono">${e.predicted_von_mises_stress_MPa}</td>
+        <td class="mono">${e.predicted_max_displacement_mm}</td>
+        <td class="pri-tag" style="color:${priorityColor[e.priority]}">${e.priority}</td>
+      </tr>`).join("");
+  }
+
+  function setConn(ok) {
+    const s = el("connStatus");
+    s.className = "chip status-pill " + (ok ? "ok" : "bad");
+    s.innerHTML = `<span class="dot ${ok ? "ok" : "bad"}"></span>` +
+      (ok ? "backend connected" : "backend offline");
+  }
+
+  // credibility chips from /metadata (loaded once)
+  async function loadMetadata() {
+    try {
+      const m = await (await fetch(BACKEND_URL + "/metadata")).json();
+      const chips = el("chips");
+      const mat = (m.material && m.material.material_name || "").split("(")[0].trim() || "material";
+      const r2 = m.metrics ? (m.metrics.stress_R2 * 100).toFixed(0) + "%" : "—";
+      const yld = m.material ? m.material.yield_strength_MPa : "—";
+      const rows = m.n_training_rows || "—";
+      const add = (html) => { const c = document.createElement("span"); c.className = "chip"; c.innerHTML = html; chips.insertBefore(c, el("connStatus")); };
+      add(`<span class="k">R²</span> <b>${r2}</b>`);
+      add(`<span class="k">material</span> <b>${mat}</b>`);
+      add(`<span class="k">yield</span> <b>${yld} MPa</b>`);
+      add(`<span class="k">trained on</span> <b>${rows} cases</b>`);
+    } catch (e) { /* backend not up yet; chips fill in on a later poll */ }
+  }
+  let metaLoaded = false;
+
+  async function poll() {
+    try {
+      const [lr, hr] = await Promise.all([
+        fetch(BACKEND_URL + "/latest"),
+        fetch(BACKEND_URL + "/history?limit=25"),
+      ]);
+      const latest = await lr.json();
+      const history = await hr.json();
+      setConn(true);
+      if (!metaLoaded) { metaLoaded = true; loadMetadata(); }
+      renderLatest(latest);
+      renderHistory(history.events);
+    } catch (e) { setConn(false); }
+  }
+
+  async function simulateImpact(sev) {
+    const preset = DEMO_PRESETS[sev];
+    const upright = el("cornerSelect").value;
     try {
       await fetch(BACKEND_URL + "/impact", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...preset, upright_id: upright, source: "dashboard_demo" }),
       });
-      poll();  // refresh immediately so the badge/car update without waiting for the next poll
-    } catch (e) {
-      setConnStatus(false);
-    }
+      poll();
+    } catch (e) { setConn(false); }
   }
 
+  // ================= boot =================
+  if (window.Car3D) Car3D.init("car3d");
+  initGauge();
+  sizeCanvas();
+  window.addEventListener("resize", sizeCanvas);
+  setInterval(stepWave, 28);
   poll();
   setInterval(poll, POLL_MS);
 </script>
