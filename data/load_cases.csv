@@ -1,0 +1,19 @@
+study,Fx,Fy,Fz,von_mises_stress_MPa,max_displacement_mm
+# ImpactIQ load-case manifest — Person 1 (SOLIDWORKS) fills this in.
+# One row per simulation study. Delete these comment lines or leave them;
+# from_solidworks.py ignores any row whose Fx is not a number.
+#
+# Columns:
+#   study                 optional name; must match the node-export filename in
+#                         --nodes-dir if you use MODE B. Ignore it for MODE A.
+#   Fx, Fy, Fz            the force you APPLIED for this study, in Newtons.
+#                         Axis: Fx=longitudinal, Fy=lateral, Fz=vertical.
+#   von_mises_stress_MPa  peak von Mises stress. Leave BLANK if a node file in
+#                         --nodes-dir will supply it (MODE B); required in MODE A.
+#   max_displacement_mm   peak resultant (URES) displacement, read off the study
+#                         result summary. ALWAYS required (stress exports have no
+#                         displacement).
+#
+# Example rows (delete before real data):
+mild_front,1500,-2000,-3000,95.4,0.31
+severe_lateral,2000,8000,-4000,410.2,1.12

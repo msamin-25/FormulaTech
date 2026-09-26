@@ -141,10 +141,29 @@ you exactly what's broken.
 Your only deliverable that plugs into the pipeline: `data/fea_dataset.csv`
 matching `data/schema.md`, and `data/material.json` with the real material's
 yield strength and elastic modulus. 8-20 well-chosen load cases spanning
-mild to severe is enough. When it's ready:
+mild to severe is enough.
 
+**You do NOT need node X/Y/Z coordinates.** The model maps one force vector per
+load case to the peak response — it is not a GNN. Skip the manual "List Results
+-> Save As CSV" spatial export; we only need each study's peak von Mises stress
+and peak displacement, plus the force you applied.
+
+**If your export is already one summary row per study** (5 columns per
+schema.md):
 ```bash
 cp your_export.csv data/fea_dataset.csv
+```
+
+**If your export is per-node stress** (node index + stress, from the VBA API),
+use the adapter to reduce it and attach the applied forces:
+```bash
+# fill data/load_cases.csv (template): applied Fx,Fy,Fz + peak displacement per study
+python data/from_solidworks.py --manifest data/load_cases.csv \
+    --nodes-dir data/solidworks_exports   # omit --nodes-dir if stress is in the manifest
+```
+
+Either way, then:
+```bash
 # edit data/material.json with real yield_strength_MPa / elastic_modulus_GPa
 python model/dataset.py data/fea_dataset.csv   # (optional) validate it loads cleanly first
 python model/train.py    # re-trains, prints new thresholds + metrics automatically
