@@ -181,18 +181,56 @@ no code edits.
 
 ## Person 3 — Arduino / dashboard
 
-- `arduino/impact_imu.ino` is Person 3's MPU-6500 sketch. It detects hits on
-  the board and prints one line per hit at 9600 baud:
-  `IMPACT,<FRONT|BACK|LEFT|RIGHT>,ax,ay,az,totalG` (g).
-- `python backend/impact_detector.py` auto-finds the Arduino's port, maps the
-  board axes to car axes (board Y- = front, X+ = left, Z up; 1 g of gravity
-  removed from Z), picks the struck corner from the hit direction, converts to
-  force and posts it. The hit shows up on that wheel of the 3D car.
-- Keep the board mounted flat in the calibrated orientation. If real taps all
-  read LOW or all read HIGH, tune `--mass` (default 200 kg).
-- `dashboard/index.html` polls the backend — restyle freely, but keep it
-  polling `GET /latest` and `GET /history` on the backend (`BACKEND_URL` is
-  a variable at the top of the `<script>` block).
+`arduino/impact_imu.ino` is Person 3's MPU-6500 sketch. It detects hits on the
+board and prints one line per hit at 9600 baud:
+`IMPACT,<FRONT|BACK|LEFT|RIGHT>,ax,ay,az,totalG` (in g).
+
+**Wiring (I2C, Arduino Uno/Nano):**
+
+| MPU-6500 pin | Arduino | Note |
+|---|---|---|
+| VCC | 3.3V | 5V only if the breakout has a regulator (most GY-6500 boards do) |
+| GND | GND | |
+| SCL | A5 | Mega: pin 21 · Leonardo/R4: SCL pin |
+| SDA | A4 | Mega: pin 20 · Leonardo/R4: SDA pin |
+| AD0 | GND | sets I2C address 0x68, which the sketch uses |
+| NCS | 3.3V | if your breakout exposes it: high selects I2C mode |
+
+**Mounting:** board flat, chip side up, **Y- toward the car's front** and
+**X+ toward the car's left** (Person 3's calibration). The software removes 1 g
+of gravity from Z, so the board must stay flat.
+
+**Two ways to get hits into the dashboard (pick one; only one program can own the port):**
+
+1. **Python bridge** (works in any browser):
+   `python backend/impact_detector.py` auto-finds the port, converts each hit to
+   a force and posts it to the backend.
+2. **Straight from the browser** (Chrome or Edge, works on Vercel too): click
+   **Connect sensor** on the dashboard and pick the Arduino's port.
+
+Both use the same mapping: board Y- = front, X+ = left, force = a × 9.81 ×
+200 kg (a quarter of an ~800 kg F1 car). The struck corner comes from the hit
+direction and lights up on the 3D car.
+
+**Troubleshooting:**
+- Nothing after `READY`: check SDA/SCL aren't swapped, and AD0 is on GND.
+- "Port is busy": close the Arduino IDE serial monitor (and the Python bridge
+  if you're using Connect sensor).
+- Every tap reads LOW (or every tap reads HIGH): tune `--mass` in the bridge,
+  and `SENSOR.massKg` in `dashboard/index.html` for the browser path.
+
+## Deploy to Vercel
+
+The dashboard is a static site, so Vercel needs no build settings.
+`vercel.json` serves the repo root and redirects `/` to `/dashboard/`, and
+`.vercelignore` keeps CAD files and Python out of the deploy.
+
+1. vercel.com → **Add New → Project** → import `msamin-25/FormulaTech` → **Deploy**.
+2. On its own, the deployed page runs the in-browser model.
+3. With the backend running on your laptop (`./run.sh`), the Vercel page in
+   Chrome switches to the trained model automatically. Chrome may ask to allow
+   access to your local network: allow it. **Connect sensor** reads the
+   Arduino over USB from the Vercel page too.
 
 ## Person 2 (you) — integration owner
 

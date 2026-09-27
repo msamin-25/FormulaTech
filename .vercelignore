@@ -1,0 +1,11 @@
+# Vercel serves the static dashboard only (the Python backend runs on the
+# presenter's laptop). Keep CAD files, raw exports and Python out of the deploy.
+.venv
+__pycache__
+*.SLDASM
+*.SLDPRT
+*.swp
+UprightBearingAssembly_Results.csv
+data/upright_nodes.csv
+data/fea_dataset.csv
+model/*.joblib

@@ -73,21 +73,58 @@ def check_envelope(fx: float, fy: float, fz: float, metadata: dict) -> dict:
     return {"in_envelope": len(reasons) == 0, "reasons": reasons}
 
 
+def envelope_scale(fx: float, fy: float, fz: float, metadata: dict) -> float:
+    """Largest factor s <= 1 that brings s*F inside the trained envelope.
+
+    1.0 means the input is already inside. Used to extrapolate beyond the
+    training data (see predict()).
+    """
+    env = metadata.get("training_envelope")
+    if not env:
+        return 1.0
+    s = 1.0
+    for axis, val in (("Fx", fx), ("Fy", fy), ("Fz", fz)):
+        lo, hi = env[axis]
+        if val > hi > 0:
+            s = min(s, hi / val)
+        elif val < lo < 0:
+            s = min(s, lo / val)
+    magnitude = (fx ** 2 + fy ** 2 + fz ** 2) ** 0.5
+    mag_max = env.get("magnitude_max")
+    if mag_max and magnitude > mag_max:
+        s = min(s, mag_max / magnitude)
+    return max(s, 1e-6)
+
+
 def predict(fx: float, fy: float, fz: float) -> dict:
     """Given a representative impact force vector, return the full
     engineering triage result: predicted stress, displacement, and
     inspection priority.
+
+    Beyond the trained envelope a tree model can only repeat the largest
+    values it has seen, so a hit twice as hard would read the same as the
+    hardest training case. Instead we use linear elasticity (stress and
+    displacement scale with load): scale the force back to the envelope edge,
+    predict there, and scale the result up by the same factor. The result is
+    still flagged as an extrapolation.
     """
     model, metadata = _load()
-    features = [build_features(fx, fy, fz)]
+    envelope = check_envelope(fx, fy, fz, metadata)
+    s = 1.0 if envelope["in_envelope"] else envelope_scale(fx, fy, fz, metadata)
+
+    features = [build_features(fx * s, fy * s, fz * s)]
     stress_mpa, disp_mm = model.predict(features)[0]
+    stress_mpa, disp_mm = stress_mpa / s, disp_mm / s
 
     thresholds = metadata["priority_thresholds"]
     priority = classify_priority(stress_mpa, thresholds)
 
     yield_mpa = metadata["material"]["yield_strength_MPa"]
 
-    envelope = check_envelope(fx, fy, fz, metadata)
+    warning = None
+    if not envelope["in_envelope"]:
+        warning = "; ".join(envelope["reasons"]) + (
+            f". Extrapolated linearly from the trained edge (x{1 / s:.2f}).")
 
     return {
         "input": {"Fx": fx, "Fy": fy, "Fz": fz},
@@ -97,8 +134,7 @@ def predict(fx: float, fy: float, fz: float) -> dict:
         "fraction_of_yield": round(float(stress_mpa) / yield_mpa, 3),
         "priority": priority,
         "in_envelope": envelope["in_envelope"],
-        "extrapolation_warning": None if envelope["in_envelope"]
-            else "; ".join(envelope["reasons"]),
+        "extrapolation_warning": warning,
         "model_type": metadata["model_type"],
     }
 

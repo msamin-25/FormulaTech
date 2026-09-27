@@ -31,12 +31,15 @@ from model.predict import predict, _load as load_model_and_metadata  # noqa: E40
 app = FastAPI(title="ImpactIQ Backend", version="0.1.0")
 
 # Wide-open CORS for a hackathon demo — dashboard may be served from a
-# different port/origin (e.g. a simple `python -m http.server` or file://).
+# different port/origin (file://, `python -m http.server`, or Vercel).
+# allow_private_network lets an https page (the Vercel deploy) reach this
+# backend on the presenter's laptop; Chrome requires the opt-in.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
+    allow_private_network=True,
 )
 
 # In-memory event log. A hackathon demo doesn't need a database; if the

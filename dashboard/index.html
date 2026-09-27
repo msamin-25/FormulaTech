@@ -120,7 +120,7 @@
   .stage canvas { position: absolute; inset: 0; display: block; }
   .hud { position: absolute; z-index: 300; pointer-events: none; }
   .hud.tl { top: 18px; left: 20px; }
-  .hud.tr { top: 14px; right: 14px; pointer-events: auto; }
+  .hud.tr { top: 14px; right: 14px; pointer-events: auto; display: flex; gap: 8px; }
   .hud.bl { left: 20px; bottom: 16px; }
   .hud.br { right: 20px; bottom: 16px; text-align: right; }
   .hud-title { font: 700 28px/1 var(--display); letter-spacing: 0.04em; text-transform: uppercase; margin-top: 6px; }
@@ -136,6 +136,16 @@
     backdrop-filter: blur(6px);
   }
   .icon-btn:hover { color: var(--text); border-color: var(--accent); }
+  .sensor-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--faint); }
+  .icon-btn.on { color: var(--low); border-color: rgba(52, 211, 153, 0.45); }
+  .icon-btn.on .sensor-dot { background: var(--low); animation: live 1.8s infinite; }
+  .toast {
+    position: absolute; left: 50%; bottom: 18px; transform: translate(-50%, 8px); z-index: 400;
+    padding: 9px 14px; border-radius: 10px; font: 500 12.5px/1.3 var(--sans); color: var(--text);
+    background: rgba(9, 13, 19, 0.92); border: 1px solid var(--line-2); backdrop-filter: blur(6px);
+    opacity: 0; pointer-events: none; transition: opacity 0.2s, transform 0.2s; max-width: 90%; text-align: center;
+  }
+  .toast.show { opacity: 1; transform: translate(-50%, 0); }
   .icon-btn svg { width: 14px; height: 14px; }
 
   /* floating corner tags projected from the wheels (created by car3d.js) */
@@ -307,6 +317,9 @@
           <div class="hud-sub">Each wheel shows its last predicted stress. Click a wheel to aim the next impact.</div>
         </div>
         <div class="hud tr">
+          <button class="icon-btn" id="sensorBtn" type="button" title="Read Person 3's Arduino over USB (Chrome or Edge)">
+            <span class="sensor-dot"></span><span id="sensorLabel">Connect sensor</span>
+          </button>
           <button class="icon-btn" id="fsBtn" type="button">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
             Present
@@ -317,6 +330,7 @@
           <span><i style="background:var(--mod)"></i>Moderate</span>
           <span><i style="background:var(--high)"></i>High</span>
         </div>
+        <div class="toast" id="toast" role="status"></div>
         <div class="hud br hint"><kbd>drag</kbd> orbit <kbd>scroll</kbd> zoom <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> impact</div>
       </div>
       <div class="deck">
@@ -680,8 +694,24 @@
     } catch (e) { metaLoaded = false; }
   }
 
+  // Switches modes on its own: falls back to the in-browser model if the backend
+  // stops answering, and reconnects when it comes back (e.g. started after the page).
+  let failCount = 0, pollCount = 0;
+  async function backendUp() {
+    try { return (await fetch(BACKEND_URL + "/health", { cache: "no-store" })).ok; } catch (e) { return false; }
+  }
+  function enterMock() {
+    mockMode = true; metaLoaded = false; el("chips").innerHTML = "";
+    if (!mockLog.length) seedMock();
+  }
   async function poll() {
+    pollCount++;
     if (mockMode) {
+      if (pollCount % 4 === 0 && await backendUp()) {
+        mockMode = false; metaLoaded = false; failCount = 0; lastKey = null;
+        toast("Backend connected. Using the trained model.");
+        return poll();
+      }
       setConn("demo"); loadMetadata();
       renderLatest(mockLog.length ? mockLog[mockLog.length - 1] : { message: "none" });
       renderHistory(mockLog);
@@ -690,24 +720,113 @@
     try {
       const [lr, hr] = await Promise.all([fetch(BACKEND_URL + "/latest"), fetch(BACKEND_URL + "/history?limit=25")]);
       const latest = await lr.json(), history = await hr.json();
+      failCount = 0;
       setConn("live"); loadMetadata();
       renderLatest(latest); renderHistory(history.events);
-    } catch (e) { setConn("offline"); }
+    } catch (e) {
+      setConn("offline");
+      if (++failCount >= 2) { enterMock(); toast("Backend unreachable. Switched to the in-browser model."); }
+    }
   }
 
-  function simulateImpact(sev) {
-    const preset = DEMO_PRESETS[sev];
-    if (!preset) return;
+  // One path for every impact: backend when it's up, in-browser model otherwise.
+  function submitImpact(F, corner, source) {
     if (mockMode) {
-      mockLog.push(mockPredict(preset.Fx, preset.Fy, preset.Fz, selectedCorner, "demo"));
+      mockLog.push(mockPredict(F.Fx, F.Fy, F.Fz, corner, source));
       if (mockLog.length > 25) mockLog.shift();
       poll(); return;
     }
     fetch(BACKEND_URL + "/impact", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...preset, upright_id: selectedCorner, source: "dashboard_demo" }),
+      body: JSON.stringify({ Fx: F.Fx, Fy: F.Fy, Fz: F.Fz, upright_id: corner, source }),
     }).then(poll).catch(() => setConn("offline"));
+  }
+
+  function simulateImpact(sev) {
+    const preset = DEMO_PRESETS[sev];
+    if (preset) submitImpact(preset, selectedCorner, "dashboard_demo");
+  }
+
+  // ================= Person 3's Arduino over USB (Web Serial) =================
+  // Same contract and mapping as backend/impact_detector.py:
+  //   line  IMPACT,<FRONT|BACK|LEFT|RIGHT>,ax,ay,az,totalG   (g, 9600 baud)
+  //   board Y- = front, X+ = left, Z up (1 g removed); F = a * 9.81 * 200 kg
+  const SENSOR = { baud: 9600, massKg: 200, gravityG: 1.0 };
+  function parseImpactLine(line) {
+    const p = line.split(",");
+    if (p.length < 5 || p[0].trim().toUpperCase() !== "IMPACT") return null;
+    const ax = parseFloat(p[2]), ay = parseFloat(p[3]), az = parseFloat(p[4]);
+    if ([ax, ay, az].some(Number.isNaN)) return null;
+    return { direction: p[1].trim().toUpperCase(), ax, ay, az };
+  }
+  function boardToImpact(ax, ay, az) {
+    const k = 9.81 * SENSOR.massKg;
+    return {
+      F: { Fx: -ay * k, Fy: ax * k, Fz: (az - SENSOR.gravityG) * k },
+      corner: (ay < 0 ? "front" : "rear") + "_" + (ax >= 0 ? "left" : "right"),
+    };
+  }
+
+  let toastTimer = null;
+  function toast(msg) {
+    const t = el("toast"); t.textContent = msg; t.classList.add("show");
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove("show"), 3200);
+  }
+  let serialPort = null, serialReader = null;
+  function setSensor(on) {
+    el("sensorBtn").classList.toggle("on", on);
+    el("sensorLabel").textContent = on ? "Sensor live" : "Connect sensor";
+  }
+  function handleSensorLine(line) {
+    if (line.toUpperCase() === "READY") { toast("Sensor ready. Tap the board."); return; }
+    const hit = parseImpactLine(line);
+    if (!hit) return;
+    const { F, corner } = boardToImpact(hit.ax, hit.ay, hit.az);
+    submitImpact(F, corner, "usb:" + hit.direction.toLowerCase());
+  }
+  async function readSensor() {
+    const decoder = new TextDecoderStream();
+    const piped = serialPort.readable.pipeTo(decoder.writable).catch(() => {});
+    serialReader = decoder.readable.getReader();
+    let buf = "";
+    try {
+      for (;;) {
+        const { value, done } = await serialReader.read();
+        if (done) break;
+        buf += value;
+        let i;
+        while ((i = buf.indexOf("\n")) >= 0) {
+          const line = buf.slice(0, i).trim(); buf = buf.slice(i + 1);
+          if (line) handleSensorLine(line);
+        }
+      }
+    } catch (e) {
+      toast("Sensor disconnected.");
+    } finally {
+      try { serialReader.releaseLock(); } catch (e) {}
+      await piped;
+      try { await serialPort.close(); } catch (e) {}
+      serialPort = null; serialReader = null; setSensor(false);
+    }
+  }
+  async function toggleSensor() {
+    if (serialReader) { try { await serialReader.cancel(); } catch (e) {} return; }
+    if (!("serial" in navigator)) { toast("The USB sensor needs Chrome or Edge on a desktop."); return; }
+    try {
+      serialPort = await navigator.serial.requestPort();
+      await serialPort.open({ baudRate: SENSOR.baud });
+    } catch (e) {
+      serialPort = null;
+      if (e.name !== "NotFoundError") {
+        toast(e.name === "InvalidStateError" || /open/i.test(e.message)
+          ? "The port is busy. Close the Arduino IDE serial monitor and the Python detector."
+          : "Couldn't open the sensor: " + e.message);
+      }
+      return;
+    }
+    setSensor(true); toast("Sensor connected. Tap the board.");
+    readSensor();
   }
 
   // ================= real FEA stress field =================
@@ -743,6 +862,7 @@
       const sev = { "1": "mild", "2": "moderate", "3": "severe" }[e.key];
       if (sev) simulateImpact(sev);
     });
+    el("sensorBtn").addEventListener("click", toggleSensor);
     el("fsBtn").addEventListener("click", () => {
       const card = el("stageCard");
       if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
@@ -750,10 +870,7 @@
     });
 
     // Use the FastAPI backend if it's reachable; otherwise fall back to the in-browser model.
-    let live = false;
-    try { const r = await fetch(BACKEND_URL + "/health", { cache: "no-store" }); live = r.ok; } catch (e) { live = false; }
-    mockMode = !live;
-    if (mockMode) seedMock();
+    if (!(await backendUp())) enterMock();
     poll();
     setInterval(poll, POLL_MS);
   })();
