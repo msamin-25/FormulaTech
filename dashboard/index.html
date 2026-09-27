@@ -170,6 +170,18 @@
     touch-action: none; }
   #car3d canvas { display: block; border-radius: 12px; }
 
+  /* ---------- Real FEA stress field ---------- */
+  #heatmap3d { width: 100%; height: 360px; border-radius: 12px;
+    background: radial-gradient(120% 90% at 50% 20%, rgba(255,84,112,.08), transparent 70%);
+    touch-action: none; }
+  #heatmap3d canvas { display: block; border-radius: 12px; }
+  .fea-legend { display: flex; align-items: center; gap: 10px; margin-top: 12px; font-size: 11px; color: var(--muted); }
+  .fea-bar { flex: 1; height: 10px; border-radius: 6px;
+    background: linear-gradient(90deg, #2650f2, #00cce6, #1ad933, #fad91a, #f22938); }
+  .fea-note { margin-top: 10px; font-size: 11.5px; color: var(--faint); line-height: 1.55; }
+  .fea-chip { color: var(--text); font-weight: 600; }
+  #feaEmpty code { color: var(--text); background: rgba(255,255,255,.06); padding: 1px 6px; border-radius: 5px; }
+
   /* ---------- Waveform ---------- */
   .wave-box { margin-top: 16px; }
   .wave-box .cap { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); margin-bottom: 6px; }
@@ -297,6 +309,22 @@
     </div>
   </div>
 
+  <!-- REAL FEA STRESS FIELD (Person 1's SOLIDWORKS export) -->
+  <div class="panel full">
+    <h2>Real FEA Stress Field — Upright (SOLIDWORKS)
+      <span style="color:var(--faint);text-transform:none;letter-spacing:0;font-weight:400">· drag to rotate · scroll to zoom</span>
+    </h2>
+    <div id="heatmap3d"></div>
+    <div id="feaEmpty" class="empty" style="display:none">
+      No FEA field loaded yet. Save Person 1's node export (<code>NodeID,X,Y,Z,Stress_MPa</code>)
+      to <code>data/upright_nodes.csv</code>, then run <code>python data/build_stress_field.py</code>.
+    </div>
+    <div class="fea-legend" id="feaLegend" style="display:none">
+      <span>low stress</span><div class="fea-bar"></div><span id="feaPeak">peak</span>
+    </div>
+    <div class="fea-note" id="feaNote"></div>
+  </div>
+
   <!-- HISTORY -->
   <div class="panel full">
     <h2>Recent Events</h2>
@@ -333,6 +361,7 @@
 
 <script src="vendor/three.min.js"></script>
 <script src="car3d.js"></script>
+<script src="heatmap3d.js"></script>
 <script>
   // ================= CONFIG (unchanged contract) =================
   const BACKEND_URL = "http://localhost:8000";
@@ -633,9 +662,30 @@
     }).then(poll).catch(() => setConn("offline"));
   }
 
+  // ================= real FEA stress field =================
+  function initHeatmap() {
+    if (!window.Heatmap3D) return;
+    Heatmap3D.init("heatmap3d", "../data/upright_field.json")
+      .then(meta => {
+        el("feaLegend").style.display = "flex";
+        el("feaPeak").textContent = `peak ${meta.peak_stress_MPa} MPa`;
+        const b = meta.bounds_mm || {};
+        el("feaNote").innerHTML =
+          `<span class="fea-chip">${(meta.n_total || 0).toLocaleString()}</span> real FEA nodes ` +
+          `(${(meta.n_rendered || 0).toLocaleString()} rendered) from Person 1's SOLIDWORKS study` +
+          (b.x ? ` · upright ≈ ${Math.round(b.x[1]-b.x[0])}×${Math.round(b.y[1]-b.y[0])}×${Math.round(b.z[1]-b.z[0])} mm` : "") +
+          `. ${meta.note || ""}`;
+      })
+      .catch(() => {
+        el("heatmap3d").style.display = "none";
+        el("feaEmpty").style.display = "block";
+      });
+  }
+
   // ================= boot =================
   (async function boot() {
     if (window.Car3D) Car3D.init("car3d");
+    initHeatmap();
     initGauge();
     sizeCanvas();
     window.addEventListener("resize", sizeCanvas);
