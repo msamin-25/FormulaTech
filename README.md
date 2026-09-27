@@ -93,7 +93,7 @@ python model/validate.py            # writes model/validation.png
 uvicorn backend.app:app --reload --host 0.0.0.0 --port 8000
 
 # 5. start the impact detector — plug in Person 3's Arduino first:
-python backend/impact_detector.py                    # auto-finds the port, 9600 baud
+python backend/impact_detector.py                    # auto-finds the port, 115200 baud
 # no hardware? emit Person 3's exact serial output instead:
 python backend/impact_detector.py --simulate-arduino
 
@@ -182,7 +182,7 @@ no code edits.
 ## Person 3 — Arduino / dashboard
 
 `arduino/impact_imu.ino` is Person 3's MPU-6500 sketch. It detects hits on the
-board and prints one line per hit at 9600 baud:
+board and prints one line per hit at 115200 baud:
 `IMPACT,<FRONT|BACK|LEFT|RIGHT>,ax,ay,az,totalG` (in g).
 
 **Wiring (I2C, Arduino Uno/Nano):**

@@ -9,7 +9,7 @@ the backend at /impact. The dashboard picks it up from there.
 SERIAL FORMATS UNDERSTOOD
 -------------------------
 1. Person 3's sketch (arduino/impact_imu.ino) — the Arduino detects the impact
-   itself and prints ONE line per hit, at 9600 baud:
+   itself and prints ONE line per hit, at 115200 baud:
 
        READY                                   (once, at boot — ignored)
        IMPACT,<DIRECTION>,<ax>,<ay>,<az>,<totalG>
@@ -51,6 +51,7 @@ USAGE
 import argparse
 import math
 import random
+import re
 import sys
 import time
 
@@ -58,13 +59,14 @@ import requests
 
 DEFAULT_BACKEND_URL = "http://localhost:8000/impact"
 G_TO_MS2 = 9.81
+SENSOR_ERROR = re.compile(r"not found|not responding|could not read|failed", re.I)
 PORT_HINTS = ("usbmodem", "usbserial", "wchusbserial", "ttyacm", "ttyusb", "arduino", "ch340", "cp210")
 
 
 def parse_args():
     p = argparse.ArgumentParser(description="ImpactIQ impact detector")
     p.add_argument("--port", default="auto", help="Serial port, or 'auto' to find the Arduino")
-    p.add_argument("--baud", type=int, default=9600, help="Must match Serial.begin() in the sketch (9600)")
+    p.add_argument("--baud", type=int, default=115200, help="Must match Serial.begin() in the sketch (115200)")
     p.add_argument("--backend-url", default=DEFAULT_BACKEND_URL)
     p.add_argument("--mass", type=float, default=200.0,
                    help="Effective mass (kg) for F = m*a. Default: quarter of an ~800 kg F1 car.")
@@ -220,6 +222,8 @@ def run(args, lines, source_name):
 
         sample = parse_sample_line(line)
         if sample is None:
+            if SENSOR_ERROR.search(line):  # the sketch halts after printing these
+                print(f"ARDUINO ERROR: {line}  (check the MPU-6500 wiring, then reset the board)")
             continue  # debug prints or partial lines
 
         # streaming format: detect here

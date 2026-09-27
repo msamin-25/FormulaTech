@@ -768,9 +768,9 @@
 
   // ================= Person 3's Arduino over USB (Web Serial) =================
   // Same contract and mapping as backend/impact_detector.py:
-  //   line  IMPACT,<FRONT|BACK|LEFT|RIGHT>,ax,ay,az,totalG   (g, 9600 baud)
+  //   line  IMPACT,<FRONT|BACK|LEFT|RIGHT>,ax,ay,az,totalG   (g, 115200 baud; ?baud= overrides)
   //   board Y- = front, X+ = left, Z up (1 g removed); F = a * 9.81 * 200 kg
-  const SENSOR = { baud: 9600, massKg: 200, gravityG: 1.0 };
+  const SENSOR = { baud: parseInt(PAGE_PARAMS.get("baud"), 10) || 115200, massKg: 200, gravityG: 1.0 };
   function parseImpactLine(line) {
     const p = line.split(",");
     if (p.length < 5 || p[0].trim().toUpperCase() !== "IMPACT") return null;
@@ -805,6 +805,9 @@
     el("sensorReadout").hidden = false;
     el("sensorReadout").textContent = `Sensor · ${sensorLines} line${sensorLines === 1 ? "" : "s"} · last: ${line.slice(0, 48)}`;
     if (line.toUpperCase().endsWith("READY")) { toast("Sensor ready. Tap the board."); return; }
+    if (/not found|not responding|could not read|failed/i.test(line)) {   // the sketch halts after these
+      toast("Arduino: " + line + " Check the MPU-6500 wiring, then press reset."); return;
+    }
     const hit = parseImpactLine(line);
     if (!hit) return;
     const { F, corner } = boardToImpact(hit.ax, hit.ay, hit.az);
@@ -854,7 +857,7 @@
     sensorLines = 0; setSensor(true); toast("Sensor connected. Tap the board.");
     setTimeout(() => {
       if (serialReader && sensorLines === 0)
-        toast("Connected, but nothing received yet. Check the baud is 9600 and tap harder.");
+        toast(`Connected, but nothing received yet. Check the sketch uses Serial.begin(${SENSOR.baud}) and tap harder.`);
     }, 7000);
     readSensor();
   }
