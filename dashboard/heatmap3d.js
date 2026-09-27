@@ -84,8 +84,11 @@
 
     animate();
 
-    return fetch(jsonUrl, { cache: "no-store" })
-      .then(r => { if (!r.ok) throw new Error("no field json"); return r.json(); })
+    // Accept preloaded data (window.UPRIGHT_FIELD via <script>, works from file://) or a URL.
+    const load = typeof jsonUrl === "object" && jsonUrl
+      ? Promise.resolve(jsonUrl)
+      : fetch(jsonUrl, { cache: "no-store" }).then(r => { if (!r.ok) throw new Error("no field json"); return r.json(); });
+    return load
       .then(data => {
         group = new THREE.Group();
 
@@ -99,17 +102,24 @@
         const geo = new THREE.BufferGeometry();
         geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
         geo.setAttribute("color", new THREE.BufferAttribute(colors, 3));
-        const mat = new THREE.PointsMaterial({ size: 0.02, vertexColors: true, sizeAttenuation: true });
+        // centre on the cloud's bounding sphere and frame the camera to it
+        geo.computeBoundingSphere();
+        const ctr = geo.boundingSphere.center.clone(), rad = geo.boundingSphere.radius || 1;
+        geo.translate(-ctr.x, -ctr.y, -ctr.z);
+        camera.position.setLength(rad / Math.sin((camera.fov * Math.PI / 180) / 2) * 1.05);
+        // sparse exports need bigger points to read as a surface
+        const size = count < 5000 ? 0.05 : count < 20000 ? 0.03 : 0.02;
+        const mat = new THREE.PointsMaterial({ size, vertexColors: true, sizeAttenuation: true });
         group.add(new THREE.Points(geo, mat));
 
         // peak marker + pulsing ring
         if (data.peak_pos) {
           const marker = new THREE.Mesh(new THREE.SphereGeometry(0.035, 16, 12),
             new THREE.MeshBasicMaterial({ color: 0xffffff }));
-          marker.position.fromArray(data.peak_pos); group.add(marker);
+          marker.position.fromArray(data.peak_pos).sub(ctr); group.add(marker);
           ripple = new THREE.Mesh(new THREE.RingGeometry(0.05, 0.075, 32),
             new THREE.MeshBasicMaterial({ color: 0xff3040, transparent: true, opacity: 0.7, side: THREE.DoubleSide }));
-          ripple.position.fromArray(data.peak_pos);
+          ripple.position.fromArray(data.peak_pos).sub(ctr);
           ripple.lookAt(camera.position);
           group.add(ripple);
         }

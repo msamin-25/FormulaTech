@@ -159,7 +159,10 @@ def build(in_path: Path, out_path: Path, max_points: int, seed: int = 7):
         "positions": positions,   # flat [x,y,z, x,y,z, ...]
         "stress": stress,         # 0..1 per point
     }
-    out_path.write_text(json.dumps(out, separators=(",", ":")))
+    payload = json.dumps(out, separators=(",", ":"))
+    out_path.write_text(payload)
+    # Same data as a script, because browsers refuse fetch() from file:// pages.
+    out_path.with_suffix(".js").write_text(f"window.UPRIGHT_FIELD={payload};\n")
     size_kb = out_path.stat().st_size / 1024
     print(f"Read {n:,} nodes from {in_path.name}")
     print(f"  peak |stress| = {peak:.2f} MPa  (colour cap {cap:.2f} MPa @ 99th pct)")

@@ -2,376 +2,443 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>ImpactIQ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
 <style>
+  /* Pit-wall telemetry: carbon ground, one ice-blue accent, semantic LOW/MOD/HIGH kept separate. */
   :root {
-    --bg: #0a0e17;
-    --bg2: #0e1524;
-    --panel: rgba(23, 29, 46, 0.72);
-    --panel-solid: #141a2b;
-    --panel-border: rgba(120, 140, 190, 0.16);
-    --text: #eef2fb;
-    --muted: #8a93ad;
-    --faint: #59627e;
-    --low: #2ee6a0;
-    --moderate: #f5b13a;
-    --high: #ff5470;
-    --accent: #5b8cff;
-    --shadow: 0 18px 50px rgba(0,0,0,.45);
+    color-scheme: dark;
+    --bg: #06080c;
+    --bg-2: #0a0e14;
+    --surface: #0e131a;
+    --surface-2: #121923;
+    --surface-3: #1a2330;
+    --line: rgba(148, 165, 190, 0.1);
+    --line-2: rgba(148, 165, 190, 0.18);
+    --text: #e8edf4;
+    --muted: #8c97a8;
+    --faint: #5f6a7c;
+    --accent: #7fa8ff;
+    --accent-strong: #3d74ff;
+    --low: #34d399;
+    --mod: #fbbf24;
+    --high: #fb4d6d;
+    --low-bg: rgba(52, 211, 153, 0.12);
+    --mod-bg: rgba(251, 191, 36, 0.12);
+    --high-bg: rgba(251, 77, 109, 0.12);
+    --display: "Barlow Condensed", "Arial Narrow", system-ui, sans-serif;
+    --sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+    --r-lg: 20px;
+    --r-md: 14px;
   }
   * { box-sizing: border-box; }
-  html, body { height: 100%; }
+  html, body { min-height: 100%; }
   body {
     margin: 0;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
-    color: var(--text);
-    background:
-      radial-gradient(1100px 600px at 15% -10%, rgba(91,140,255,.18), transparent 60%),
-      radial-gradient(900px 500px at 100% 0%, rgba(46,230,160,.10), transparent 55%),
-      linear-gradient(180deg, var(--bg2), var(--bg));
+    background: var(--bg);
+    background-image:
+      radial-gradient(1200px 700px at 72% -12%, rgba(61, 116, 255, 0.11), transparent 60%),
+      radial-gradient(900px 600px at -10% 110%, rgba(52, 211, 153, 0.05), transparent 60%);
     background-attachment: fixed;
-    min-height: 100%;
-    padding: 20px clamp(16px, 4vw, 40px) 48px;
+    color: var(--text);
+    font: 14px/1.5 var(--sans);
     -webkit-font-smoothing: antialiased;
   }
-  .mono { font-family: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace; }
-
-  /* ---------- Header ---------- */
-  header {
-    display: flex; align-items: center; gap: 16px;
-    flex-wrap: wrap;
-    padding-bottom: 18px; margin-bottom: 22px;
-    border-bottom: 1px solid var(--panel-border);
+  /* faint engineering grid, masked toward the edges */
+  body::before {
+    content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 0;
+    background-image:
+      linear-gradient(rgba(148, 165, 190, 0.035) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(148, 165, 190, 0.035) 1px, transparent 1px);
+    background-size: 48px 48px;
+    -webkit-mask-image: radial-gradient(ellipse at 50% 30%, #000 30%, transparent 80%);
+            mask-image: radial-gradient(ellipse at 50% 30%, #000 30%, transparent 80%);
   }
-  .brand { display: flex; align-items: center; gap: 13px; }
-  .logo {
-    width: 42px; height: 42px; border-radius: 12px; flex: 0 0 auto;
-    background: linear-gradient(135deg, var(--accent), #7b5bff);
-    display: grid; place-items: center;
-    box-shadow: 0 8px 22px rgba(91,140,255,.4);
-  }
-  .logo svg { width: 24px; height: 24px; }
-  .brand h1 { font-size: 20px; margin: 0; letter-spacing: -.01em; font-weight: 700; }
-  .brand .tag { font-size: 12px; color: var(--muted); margin-top: 1px; }
-  .brand .tag b { color: var(--accent); font-weight: 600; }
-
-  .chips { display: flex; gap: 8px; flex-wrap: wrap; margin-left: auto; align-items: center; }
-  .chip {
-    display: inline-flex; align-items: center; gap: 7px;
-    background: rgba(255,255,255,.04); border: 1px solid var(--panel-border);
-    border-radius: 999px; padding: 6px 12px; font-size: 12px; color: var(--muted);
-    white-space: nowrap;
-  }
-  .chip b { color: var(--text); font-weight: 600; }
-  .chip .k { color: var(--faint); }
-  .status-pill { transition: all .3s; }
-  .status-pill.ok { color: var(--low); border-color: rgba(46,230,160,.35); background: rgba(46,230,160,.08); }
-  .status-pill.bad { color: var(--high); border-color: rgba(255,84,112,.35); background: rgba(255,84,112,.08); }
-  .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
-  .dot.ok { background: var(--low); box-shadow: 0 0 0 0 rgba(46,230,160,.6); animation: livedot 1.8s infinite; }
-  .dot.bad { background: var(--high); }
-  @keyframes livedot {
-    0% { box-shadow: 0 0 0 0 rgba(46,230,160,.55); }
-    70% { box-shadow: 0 0 0 7px rgba(46,230,160,0); }
-    100% { box-shadow: 0 0 0 0 rgba(46,230,160,0); }
+  .app { position: relative; z-index: 1; max-width: 1480px; margin: 0 auto; padding: 18px clamp(16px, 3vw, 32px) 36px; }
+  .mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  kbd {
+    font: 500 10.5px/1 var(--mono); padding: 3px 6px; border-radius: 6px;
+    border: 1px solid var(--line-2); background: rgba(255, 255, 255, 0.04); color: var(--muted);
   }
 
-  /* ---------- Layout ---------- */
-  .grid {
-    display: grid;
-    grid-template-columns: 1.35fr 1fr;
-    gap: 18px;
-    align-items: stretch;
+  /* ---------- top bar ---------- */
+  .topbar {
+    display: flex; align-items: center; gap: 16px 24px; flex-wrap: wrap;
+    padding-bottom: 18px; margin-bottom: 20px; border-bottom: 1px solid var(--line);
   }
-  @media (max-width: 960px) { .grid { grid-template-columns: 1fr; } }
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .mark {
+    width: 40px; height: 40px; border-radius: 11px; display: grid; place-items: center; flex: none;
+    background: linear-gradient(145deg, var(--accent-strong), var(--accent));
+    box-shadow: 0 6px 20px rgba(61, 116, 255, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  }
+  .mark svg { width: 22px; height: 22px; }
+  .brand-name { font: 800 24px/1 var(--display); letter-spacing: 0.05em; text-transform: uppercase; }
+  .brand-sub { font-size: 12px; color: var(--muted); margin-top: 3px; }
+  .topbar-right { display: flex; align-items: center; gap: 12px; margin-left: auto; flex-wrap: wrap; }
+  .session { display: flex; flex-wrap: wrap; border: 1px solid var(--line); border-radius: 12px; background: rgba(14, 19, 26, 0.7); }
+  .session:empty { display: none; }
+  .kv { display: flex; flex-direction: column; padding: 6px 14px; border-left: 1px solid var(--line); }
+  .kv:first-child { border-left: 0; }
+  .kv .k { font: 600 10px/1.3 var(--sans); letter-spacing: 0.12em; text-transform: uppercase; color: var(--faint); }
+  .kv .v { font: 500 13px/1.35 var(--mono); font-variant-numeric: tabular-nums; }
+  .status-pill {
+    display: inline-flex; align-items: center; gap: 8px; padding: 8px 13px; border-radius: 999px;
+    font: 600 12px/1 var(--sans); border: 1px solid var(--line-2); background: var(--surface); color: var(--muted);
+  }
+  .status-pill.ok { color: var(--low); border-color: rgba(52, 211, 153, 0.35); background: var(--low-bg); }
+  .status-pill.bad { color: var(--high); border-color: rgba(251, 77, 109, 0.35); background: var(--high-bg); }
+  .status-pill .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+  .status-pill.ok .dot { animation: live 1.8s infinite; }
+  @keyframes live { 0% { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.55); } 70% { box-shadow: 0 0 0 7px rgba(52, 211, 153, 0); } 100% { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0); } }
 
-  .panel {
-    background: var(--panel);
-    border: 1px solid var(--panel-border);
-    border-radius: 18px;
-    padding: 22px;
-    backdrop-filter: blur(10px);
-    box-shadow: var(--shadow);
-    position: relative;
-    overflow: hidden;
-  }
-  .panel h2 {
-    font-size: 11px; text-transform: uppercase; letter-spacing: .12em;
-    color: var(--muted); margin: 0 0 16px; font-weight: 600;
-  }
-  .panel h2 .live { color: var(--low); margin-left: 6px; }
+  /* ---------- layout ---------- */
+  .layout { display: grid; grid-template-columns: minmax(0, 1fr) 400px; gap: 20px; align-items: stretch; }
+  @media (max-width: 1180px) { .layout { grid-template-columns: minmax(0, 1fr); } }
 
-  /* hero verdict panel gets a tinted top edge that reflects priority */
-  #heroPanel::before {
+  .card {
+    position: relative; overflow: hidden; padding: 20px;
+    border: 1px solid var(--line); border-radius: var(--r-lg);
+    background: linear-gradient(180deg, rgba(20, 27, 37, 0.92), rgba(13, 18, 25, 0.92));
+  }
+  .card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+  .eyebrow { font: 600 11px/1.2 var(--sans); letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+  .card-title { font: 700 20px/1.1 var(--display); letter-spacing: 0.04em; text-transform: uppercase; margin-top: 6px; }
+
+  /* ---------- 3D stage ---------- */
+  .stage-card { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: var(--r-lg); overflow: hidden; background: var(--surface); }
+  .stage {
+    position: relative; flex: 1; min-height: clamp(420px, 58vh, 600px); overflow: hidden; touch-action: none;
+    background:
+      radial-gradient(ellipse 70% 58% at 50% 40%, #17233b 0%, #0c121d 55%, #070a10 100%);
+  }
+  .stage canvas { position: absolute; inset: 0; display: block; }
+  .hud { position: absolute; z-index: 300; pointer-events: none; }
+  .hud.tl { top: 18px; left: 20px; }
+  .hud.tr { top: 14px; right: 14px; pointer-events: auto; }
+  .hud.bl { left: 20px; bottom: 16px; }
+  .hud.br { right: 20px; bottom: 16px; text-align: right; }
+  .hud-title { font: 700 28px/1 var(--display); letter-spacing: 0.04em; text-transform: uppercase; margin-top: 6px; }
+  .hud-sub { font-size: 12px; color: var(--muted); margin-top: 5px; max-width: 34ch; }
+  .legend { display: flex; gap: 14px; font: 500 11px/1 var(--mono); color: var(--muted); }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .legend i { width: 8px; height: 8px; border-radius: 50%; }
+  .hint { font-size: 11.5px; color: var(--faint); display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+  .icon-btn {
+    display: inline-flex; align-items: center; gap: 7px; cursor: pointer;
+    font: 600 12px/1 var(--sans); color: var(--muted);
+    background: rgba(10, 14, 20, 0.72); border: 1px solid var(--line-2); border-radius: 10px; padding: 8px 11px;
+    backdrop-filter: blur(6px);
+  }
+  .icon-btn:hover { color: var(--text); border-color: var(--accent); }
+  .icon-btn svg { width: 14px; height: 14px; }
+
+  /* floating corner tags projected from the wheels (created by car3d.js) */
+  .corner-layer { position: absolute; inset: 0; pointer-events: none; z-index: 200; }
+  .corner-tag {
+    position: absolute; left: 0; top: 0; pointer-events: auto; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 7px; padding: 5px 10px 5px 8px; border-radius: 999px;
+    background: rgba(9, 13, 19, 0.8); border: 1px solid var(--line-2); backdrop-filter: blur(6px);
+    font: 500 11px/1 var(--mono); color: var(--muted); white-space: nowrap;
+    transition: border-color 0.2s, box-shadow 0.2s, color 0.2s;
+  }
+  .corner-tag .ct-name { font: 700 13px/1 var(--display); letter-spacing: 0.08em; color: var(--text); }
+  .corner-tag .ct-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--faint); }
+  .corner-tag.ct-LOW .ct-dot { background: var(--low); }
+  .corner-tag.ct-MODERATE .ct-dot { background: var(--mod); }
+  .corner-tag.ct-HIGH .ct-dot { background: var(--high); box-shadow: 0 0 10px var(--high); }
+  .corner-tag.ct-HIGH { border-color: rgba(251, 77, 109, 0.5); color: #ffc2cd; }
+  .corner-tag.ct-MODERATE { border-color: rgba(251, 191, 36, 0.4); }
+  .corner-tag.hover, .corner-tag:hover { border-color: var(--line-2); color: var(--text); }
+  .corner-tag.selected { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(127, 168, 255, 0.18); }
+
+  /* control deck under the stage */
+  .deck {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 14px 22px;
+    padding: 14px 18px; border-top: 1px solid var(--line); background: rgba(9, 13, 19, 0.65);
+  }
+  .deck-group { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .deck-label { font: 600 10.5px/1 var(--sans); letter-spacing: 0.12em; text-transform: uppercase; color: var(--faint); }
+  .seg { display: inline-flex; padding: 3px; gap: 2px; border-radius: 12px; background: var(--bg-2); border: 1px solid var(--line-2); }
+  .seg button {
+    font: 700 14px/1 var(--display); letter-spacing: 0.08em; color: var(--muted);
+    background: transparent; border: 0; border-radius: 9px; padding: 9px 12px; min-width: 46px; cursor: pointer;
+  }
+  .seg button:hover { color: var(--text); }
+  .seg button[aria-pressed="true"] { color: var(--text); background: var(--surface-3); box-shadow: inset 0 0 0 1px rgba(127, 168, 255, 0.5); }
+  .hit {
+    display: inline-flex; align-items: center; gap: 10px; padding: 9px 12px; cursor: pointer;
+    border-radius: 12px; border: 1px solid var(--line-2); background: var(--surface-2); color: var(--text);
+    font: 600 13px/1 var(--sans); transition: transform 0.12s, border-color 0.15s, background 0.15s;
+  }
+  .hit .sw { width: 8px; height: 8px; border-radius: 50%; }
+  .hit-low .sw { background: var(--low); }
+  .hit-mod .sw { background: var(--mod); }
+  .hit-high .sw { background: var(--high); }
+  .hit:hover { transform: translateY(-1px); }
+  .hit:active { transform: translateY(0); }
+  .hit-low:hover { border-color: rgba(52, 211, 153, 0.6); background: var(--low-bg); }
+  .hit-mod:hover { border-color: rgba(251, 191, 36, 0.6); background: var(--mod-bg); }
+  .hit-high:hover { border-color: rgba(251, 77, 109, 0.6); background: var(--high-bg); }
+  .deck-note { margin-left: auto; font-size: 11.5px; color: var(--faint); }
+
+  .stage-card:fullscreen { display: flex; flex-direction: column; border-radius: 0; background: var(--bg); }
+  .stage-card:fullscreen .stage { flex: 1; height: auto; }
+
+  /* ---------- verdict card ---------- */
+  .verdict-card::before {
     content: ""; position: absolute; inset: 0 0 auto 0; height: 3px;
-    background: var(--edge, var(--accent)); opacity: .9; transition: background .4s;
+    background: var(--edge, var(--line-2)); transition: background 0.4s;
   }
-  #heroPanel.flash { animation: flash .7s ease-out; }
-  @keyframes flash {
-    0% { box-shadow: 0 0 0 0 var(--edge); }
-    100% { box-shadow: var(--shadow); }
+  .verdict-card.flash { animation: flash 0.8s ease-out; }
+  @keyframes flash { 0% { box-shadow: inset 0 0 0 1px var(--edge), 0 0 40px -8px var(--edge); } 100% { box-shadow: none; } }
+  .live-tag { font: 600 10.5px/1 var(--mono); letter-spacing: 0.1em; color: var(--low); display: inline-flex; align-items: center; gap: 6px; }
+  .live-tag::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--low); }
+  .verdict-row { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
+  .verdict-word {
+    font: 800 76px/0.88 var(--display); letter-spacing: 0.02em; text-transform: uppercase;
+    text-shadow: 0 0 40px var(--glow, transparent); transition: color 0.35s;
   }
-
-  /* ---------- Hero verdict ---------- */
-  .hero { display: grid; grid-template-columns: auto 1fr; gap: 24px; align-items: center; }
-  @media (max-width: 520px) { .hero { grid-template-columns: 1fr; text-align: center; justify-items: center; } }
-
-  .gauge-wrap { position: relative; width: 210px; height: 168px; }
-  .gauge-center {
-    position: absolute; inset: 0; display: flex; flex-direction: column;
-    align-items: center; justify-content: center; padding-top: 14px;
+  .prLOW { color: var(--low); } .prMODERATE { color: var(--mod); } .prHIGH { color: var(--high); }
+  .corner-badge {
+    font: 700 13px/1 var(--display); letter-spacing: 0.08em; text-transform: uppercase; white-space: nowrap;
+    padding: 7px 10px; border-radius: 8px; border: 1px solid var(--line-2); color: var(--muted);
   }
-  .gauge-pct { font-size: 40px; font-weight: 700; line-height: 1; letter-spacing: -.02em; }
-  .gauge-cap { font-size: 10.5px; color: var(--muted); text-transform: uppercase; letter-spacing: .1em; margin-top: 5px; }
-  .gauge-scale { position: absolute; bottom: 6px; width: 100%; display: flex; justify-content: space-between; padding: 0 12px; font-size: 10px; color: var(--faint); }
+  .verdict-action { font: 600 15px/1.4 var(--sans); margin-top: 12px; }
+  .verdict-action .sub { font-weight: 400; font-size: 13px; color: var(--muted); margin-top: 2px; }
 
-  .verdict .label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .1em; }
-  .verdict .word {
-    font-size: 52px; font-weight: 800; line-height: 1; margin: 6px 0 8px; letter-spacing: -.02em;
-    transition: color .35s; text-shadow: 0 0 30px var(--glow, transparent);
-  }
-  .verdict .action { font-size: 15px; color: var(--text); font-weight: 500; }
-  .verdict .action .sub { color: var(--muted); font-weight: 400; }
-  .prLOW { color: var(--low); } .prMODERATE { color: var(--moderate); } .prHIGH { color: var(--high); }
+  .gauge { position: relative; width: 100%; max-width: 300px; margin: 16px auto 0; }
+  .gauge svg { width: 100%; height: auto; display: block; overflow: visible; }
+  .gauge-read { position: absolute; left: 0; right: 0; top: 38%; text-align: center; }
+  .gauge-pct { font: 700 46px/1 var(--display); font-variant-numeric: tabular-nums; }
+  .gauge-pct small { font-size: 22px; color: var(--muted); margin-left: 2px; }
+  .gauge-cap { font: 600 10px/1 var(--sans); letter-spacing: 0.14em; text-transform: uppercase; color: var(--faint); margin-top: 6px; }
 
-  .empty-hero { text-align: center; padding: 30px 10px; color: var(--muted); }
-  .empty-hero .big { font-size: 17px; color: var(--text); margin-bottom: 6px; }
-  .pulse-ring {
-    width: 54px; height: 54px; margin: 0 auto 14px; border-radius: 50%;
-    border: 2px solid var(--accent); animation: waiting 1.6s ease-out infinite;
-  }
-  @keyframes waiting { 0% { transform: scale(.6); opacity: 1; } 100% { transform: scale(1.3); opacity: 0; } }
-
-  /* ---------- Metrics ---------- */
-  .metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 22px; }
-  @media (max-width: 620px) { .metrics { grid-template-columns: repeat(2, 1fr); } }
-  .metric {
-    background: rgba(255,255,255,.035); border: 1px solid var(--panel-border);
-    border-radius: 12px; padding: 13px 14px;
-  }
-  .metric .label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .06em; }
-  .metric .value { font-size: 24px; font-weight: 700; margin-top: 4px; letter-spacing: -.01em; }
-  .metric .value small { font-size: 13px; font-weight: 500; color: var(--muted); margin-left: 2px; }
-
-  .meta { margin-top: 16px; font-size: 12.5px; color: var(--muted); line-height: 1.7; }
-  .meta code { color: var(--text); background: rgba(255,255,255,.05); padding: 1px 6px; border-radius: 5px; font-size: 12px; }
-
+  .metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
+  .metric { padding: 12px 14px; border-radius: 12px; background: rgba(255, 255, 255, 0.025); border: 1px solid var(--line); }
+  .metric .label { font: 600 10.5px/1.2 var(--sans); letter-spacing: 0.1em; text-transform: uppercase; color: var(--faint); }
+  .metric .value { font: 500 22px/1.2 var(--mono); font-variant-numeric: tabular-nums; margin-top: 6px; }
+  .metric .value small { font-size: 12px; color: var(--muted); margin-left: 4px; }
+  .meta { margin-top: 14px; font-size: 12px; color: var(--muted); line-height: 1.7; }
+  .meta code { font: 12px var(--mono); color: var(--text); background: rgba(255, 255, 255, 0.05); padding: 1px 6px; border-radius: 5px; }
   .envelope-warn {
-    margin-top: 16px; padding: 12px 14px; border-radius: 12px; font-size: 12.5px;
-    background: rgba(255,84,112,.10); border: 1px solid rgba(255,84,112,.4);
-    color: #ffb3c1; line-height: 1.55; display: none;
+    margin-top: 14px; padding: 12px 14px; border-radius: 12px; font-size: 12.5px; line-height: 1.55; display: none;
+    background: var(--high-bg); border: 1px solid rgba(251, 77, 109, 0.4); color: #ffc2cd;
   }
   .envelope-warn b { color: var(--high); }
+  .empty-hero { text-align: center; padding: 56px 12px; color: var(--muted); }
+  .empty-hero .big { font: 700 22px/1.2 var(--display); letter-spacing: 0.04em; text-transform: uppercase; color: var(--text); margin-bottom: 6px; }
+  .pulse-ring { width: 56px; height: 56px; margin: 0 auto 16px; border-radius: 50%; border: 2px solid var(--accent); animation: waiting 1.6s ease-out infinite; }
+  @keyframes waiting { 0% { transform: scale(0.6); opacity: 1; } 100% { transform: scale(1.3); opacity: 0; } }
 
-  /* ---------- 3D car ---------- */
-  #car3d { width: 100%; height: 300px; border-radius: 12px;
-    background: radial-gradient(120% 90% at 50% 20%, rgba(91,140,255,.10), transparent 70%);
-    touch-action: none; }
-  #car3d canvas { display: block; border-radius: 12px; }
-
-  /* ---------- Real FEA stress field ---------- */
-  #heatmap3d { width: 100%; height: 360px; border-radius: 12px;
-    background: radial-gradient(120% 90% at 50% 20%, rgba(255,84,112,.08), transparent 70%);
-    touch-action: none; }
-  #heatmap3d canvas { display: block; border-radius: 12px; }
-  .fea-legend { display: flex; align-items: center; gap: 10px; margin-top: 12px; font-size: 11px; color: var(--muted); }
-  .fea-bar { flex: 1; height: 10px; border-radius: 6px;
-    background: linear-gradient(90deg, #2650f2, #00cce6, #1ad933, #fad91a, #f22938); }
-  .fea-note { margin-top: 10px; font-size: 11.5px; color: var(--faint); line-height: 1.55; }
-  .fea-chip { color: var(--text); font-weight: 600; }
-  #feaEmpty code { color: var(--text); background: rgba(255,255,255,.06); padding: 1px 6px; border-radius: 5px; }
-
-  /* ---------- Waveform ---------- */
-  .wave-box { margin-top: 16px; }
-  .wave-box .cap { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); margin-bottom: 6px; }
-  canvas#wave { width: 100%; height: 90px; display: block; border-radius: 10px;
-    background: rgba(0,0,0,.22); border: 1px solid var(--panel-border); }
-
-  /* ---------- History ---------- */
-  table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--panel-border); }
-  th { color: var(--faint); font-weight: 600; font-size: 10.5px; text-transform: uppercase; letter-spacing: .06em; }
-  tbody tr { transition: background .2s; }
-  tbody tr:hover { background: rgba(255,255,255,.03); }
-  tr.row-HIGH td:first-child { box-shadow: inset 3px 0 0 var(--high); }
-  tr.row-MODERATE td:first-child { box-shadow: inset 3px 0 0 var(--moderate); }
-  tr.row-LOW td:first-child { box-shadow: inset 3px 0 0 var(--low); }
-  .pri-tag { font-weight: 700; font-size: 12px; }
-  .empty { color: var(--muted); font-size: 14px; padding: 22px 0; text-align: center; }
-
-  /* ---------- Demo controls ---------- */
-  .demo-panel { margin-top: 18px; border-style: dashed; }
-  .demo-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
-  .demo-row .lbl { color: var(--muted); font-size: 13px; }
-  select, .demo-btn {
-    background: rgba(255,255,255,.05); color: var(--text);
-    border: 1px solid var(--panel-border); border-radius: 10px;
-    padding: 9px 15px; font-size: 14px; cursor: pointer; font-family: inherit;
-    transition: all .18s;
+  /* ---------- FEA field ---------- */
+  #heatmap3d {
+    width: 100%; height: 400px; border-radius: var(--r-md); touch-action: none;
+    background: radial-gradient(ellipse 70% 60% at 50% 40%, rgba(251, 77, 109, 0.07), transparent 70%), var(--bg-2);
+    border: 1px solid var(--line);
   }
-  select:hover { border-color: var(--accent); }
-  .demo-btn { font-weight: 600; }
-  .demo-btn:active { transform: translateY(1px); }
-  .demo-btn.mild:hover     { border-color: var(--low); color: var(--low); box-shadow: 0 0 18px rgba(46,230,160,.25); }
-  .demo-btn.moderate:hover { border-color: var(--moderate); color: var(--moderate); box-shadow: 0 0 18px rgba(245,177,58,.25); }
-  .demo-btn.severe:hover   { border-color: var(--high); color: var(--high); box-shadow: 0 0 18px rgba(255,84,112,.25); }
-  .demo-hint { color: var(--faint); font-size: 11.5px; margin-top: 12px; line-height: 1.55; }
+  #heatmap3d canvas { display: block; border-radius: var(--r-md); }
+  .fea-legend { display: flex; align-items: center; gap: 10px; margin-top: 12px; font: 500 11px/1 var(--mono); color: var(--muted); }
+  .fea-bar { flex: 1; height: 8px; border-radius: 6px; background: linear-gradient(90deg, #2650f2, #00cce6, #1ad933, #fad91a, #f22938); }
+  .fea-note { margin-top: 10px; font-size: 12px; color: var(--faint); line-height: 1.6; }
+  .fea-chip { color: var(--text); font-weight: 600; }
+  #feaEmpty { padding: 40px 12px; text-align: center; color: var(--muted); font-size: 13px; }
+  #feaEmpty code { font: 12px var(--mono); color: var(--text); background: rgba(255, 255, 255, 0.06); padding: 1px 6px; border-radius: 5px; }
 
-  .full { margin-top: 18px; }
+  /* ---------- telemetry ---------- */
+  .wave-cap { display: flex; justify-content: space-between; font: 500 11px/1 var(--mono); color: var(--muted); margin-bottom: 8px; }
+  canvas#wave { width: 100%; height: 96px; display: block; border-radius: 12px; background: var(--bg-2); border: 1px solid var(--line); }
+  .log { list-style: none; margin: 16px 0 0; padding: 0; max-height: 330px; overflow: auto; }
+  .log-row { display: grid; grid-template-columns: 3px 1fr auto; gap: 12px; align-items: center; padding: 10px 2px; border-top: 1px solid var(--line); }
+  .log-stripe { align-self: stretch; border-radius: 2px; background: var(--faint); }
+  .pr-LOW .log-stripe { background: var(--low); } .pr-MODERATE .log-stripe { background: var(--mod); } .pr-HIGH .log-stripe { background: var(--high); }
+  .log-top { display: flex; align-items: center; gap: 8px; }
+  .log-corner { font: 600 13px/1.2 var(--sans); }
+  .pill { font: 700 10px/1 var(--sans); letter-spacing: 0.1em; padding: 4px 7px; border-radius: 6px; }
+  .pill-LOW { color: var(--low); background: var(--low-bg); }
+  .pill-MODERATE { color: var(--mod); background: var(--mod-bg); }
+  .pill-HIGH { color: var(--high); background: var(--high-bg); }
+  .log-sub { font: 12px/1.4 var(--mono); color: var(--muted); margin-top: 3px; }
+  .log-time { font: 12px/1 var(--mono); color: var(--faint); }
+  .log-empty { color: var(--muted); font-size: 13px; padding: 18px 0; text-align: center; }
+
+  .foot { margin-top: 22px; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px 16px; font-size: 12px; color: var(--faint); }
+
+  @media (max-width: 560px) {
+    .verdict-word { font-size: 58px; }
+    .stage { min-height: 380px; }
+    .hud.br { display: none; }
+    .kv { padding: 6px 10px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before { animation: none !important; transition: none !important; }
+  }
 </style>
 </head>
 <body>
+<div class="app">
 
-  <header>
+  <header class="topbar">
     <div class="brand">
-      <div class="logo">
-        <svg viewBox="0 0 24 24" fill="none"><path d="M13 2 4 14h6l-1 8 9-12h-6l1-8z" fill="#fff"/></svg>
-      </div>
+      <div class="mark"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M13 2 4 14h6l-1 8 9-12h-6l1-8z" fill="#fff"/></svg></div>
       <div>
-        <h1>ImpactIQ</h1>
-        <div class="tag">Post-impact structural triage &middot; <b>AI surrogate</b> trained on SOLIDWORKS FEA</div>
+        <div class="brand-name">ImpactIQ</div>
+        <div class="brand-sub">Post-impact upright triage · AI surrogate trained on SOLIDWORKS FEA</div>
       </div>
     </div>
-    <div class="chips" id="chips">
-      <span class="chip status-pill bad" id="connStatus"><span class="dot bad"></span>connecting…</span>
+    <div class="topbar-right">
+      <div class="session" id="chips"></div>
+      <span class="status-pill bad" id="connStatus"><span class="dot"></span>Starting…</span>
     </div>
   </header>
 
-  <div class="grid">
-    <!-- HERO -->
-    <div class="panel" id="heroPanel">
-      <h2>Latest Impact <span class="live" id="liveTag" style="display:none">● LIVE</span></h2>
+  <main class="layout">
+    <!-- 3D stage -->
+    <section class="stage-card" id="stageCard" aria-label="Car view">
+      <div class="stage" id="car3d">
+        <div class="hud tl">
+          <div class="eyebrow">Live telemetry</div>
+          <div class="hud-title">Upright status</div>
+          <div class="hud-sub">Each wheel shows its last predicted stress. Click a wheel to aim the next impact.</div>
+        </div>
+        <div class="hud tr">
+          <button class="icon-btn" id="fsBtn" type="button">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
+            Present
+          </button>
+        </div>
+        <div class="hud bl legend" aria-hidden="true">
+          <span><i style="background:var(--low)"></i>Low</span>
+          <span><i style="background:var(--mod)"></i>Moderate</span>
+          <span><i style="background:var(--high)"></i>High</span>
+        </div>
+        <div class="hud br hint"><kbd>drag</kbd> orbit <kbd>scroll</kbd> zoom <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> impact</div>
+      </div>
+      <div class="deck">
+        <div class="deck-group">
+          <span class="deck-label">Corner</span>
+          <div class="seg" id="cornerSeg" role="group" aria-label="Corner">
+            <button type="button" data-corner="front_left" aria-pressed="false">FL</button>
+            <button type="button" data-corner="front_right" aria-pressed="true">FR</button>
+            <button type="button" data-corner="rear_left" aria-pressed="false">RL</button>
+            <button type="button" data-corner="rear_right" aria-pressed="false">RR</button>
+          </div>
+        </div>
+        <div class="deck-group">
+          <span class="deck-label">Simulate impact</span>
+          <button class="hit hit-low" type="button" data-sev="mild"><span class="sw"></span>Mild tap<kbd>1</kbd></button>
+          <button class="hit hit-mod" type="button" data-sev="moderate"><span class="sw"></span>Moderate hit<kbd>2</kbd></button>
+          <button class="hit hit-high" type="button" data-sev="severe"><span class="sw"></span>Severe impact<kbd>3</kbd></button>
+        </div>
+      </div>
+    </section>
+
+    <!-- verdict -->
+    <aside class="card verdict-card" id="heroPanel" aria-live="polite">
+      <div class="card-head">
+        <span class="eyebrow">Latest impact</span>
+        <span class="live-tag" id="liveTag" style="display:none">LIVE</span>
+      </div>
 
       <div id="emptyHero" class="empty-hero">
         <div class="pulse-ring"></div>
         <div class="big">Awaiting first impact</div>
-        <div>Hit the IMU, or use the demo controls below.</div>
+        <div>Hit the IMU, or press 1, 2 or 3.</div>
       </div>
 
       <div id="heroContent" style="display:none">
-        <div class="hero">
-          <!-- Gauge -->
-          <div class="gauge-wrap">
-            <svg viewBox="0 0 210 168" style="width:210px;height:168px">
-              <polyline id="gaugeTrack" fill="none" stroke="rgba(255,255,255,.08)" stroke-width="14" stroke-linecap="round"/>
-              <polyline id="gaugeFill"  fill="none" stroke="var(--accent)" stroke-width="14" stroke-linecap="round"/>
-              <g id="gaugeTicks" stroke="var(--bg)" stroke-width="2.5"></g>
-            </svg>
-            <div class="gauge-center">
-              <div class="gauge-pct mono" id="gaugePct">0<small style="font-size:20px">%</small></div>
-              <div class="gauge-cap">of yield strength</div>
-            </div>
-            <div class="gauge-scale"><span>0</span><span>yield</span></div>
-          </div>
+        <div class="verdict-row">
+          <div class="verdict-word" id="verdictWord">—</div>
+          <span class="corner-badge" id="cornerBadge">—</span>
+        </div>
+        <div class="verdict-action" id="verdictAction"></div>
 
-          <!-- Verdict -->
-          <div class="verdict">
-            <div class="label">Inspection priority</div>
-            <div class="word" id="verdictWord">—</div>
-            <div class="action" id="verdictAction"></div>
+        <div class="gauge">
+          <svg viewBox="0 0 260 180" aria-hidden="true">
+            <polyline id="gzLow"  fill="none" stroke="rgba(52,211,153,.16)"  stroke-width="16" stroke-linecap="butt"></polyline>
+            <polyline id="gzMod"  fill="none" stroke="rgba(251,191,36,.16)"  stroke-width="16" stroke-linecap="butt"></polyline>
+            <polyline id="gzHigh" fill="none" stroke="rgba(251,77,109,.16)"  stroke-width="16" stroke-linecap="butt"></polyline>
+            <polyline id="gaugeFill" fill="none" stroke="var(--accent)" stroke-width="16" stroke-linecap="round"></polyline>
+            <g id="gaugeTicks"></g>
+          </svg>
+          <div class="gauge-read">
+            <div class="gauge-pct" id="gaugePct">0<small>%</small></div>
+            <div class="gauge-cap">of yield strength</div>
           </div>
         </div>
 
         <div class="metrics">
-          <div class="metric">
-            <div class="label">von Mises stress</div>
-            <div class="value mono"><span id="stressVal">0</span><small>MPa</small></div>
-          </div>
-          <div class="metric">
-            <div class="label">Displacement</div>
-            <div class="value mono"><span id="dispVal">0</span><small>mm</small></div>
-          </div>
-          <div class="metric">
-            <div class="label">Impact force |F|</div>
-            <div class="value mono"><span id="forceVal">0</span><small>N</small></div>
-          </div>
-          <div class="metric">
-            <div class="label">Upright</div>
-            <div class="value" id="uprightVal" style="font-size:20px">—</div>
-          </div>
+          <div class="metric"><div class="label">von Mises stress</div><div class="value"><span id="stressVal">0</span><small>MPa</small></div></div>
+          <div class="metric"><div class="label">Displacement</div><div class="value"><span id="dispVal">0</span><small>mm</small></div></div>
+          <div class="metric"><div class="label">Impact force |F|</div><div class="value"><span id="forceVal">0</span><small>N</small></div></div>
+          <div class="metric"><div class="label">Safety factor</div><div class="value"><span id="fosVal">0</span><small>× yield</small></div></div>
         </div>
 
         <div class="meta" id="metaInfo"></div>
         <div class="envelope-warn" id="envelopeWarn"></div>
       </div>
-    </div>
+    </aside>
 
-    <!-- CAR + WAVE -->
-    <div class="panel">
-      <h2>Affected Upright <span style="color:var(--faint);text-transform:none;letter-spacing:0;font-weight:400">· drag to rotate</span></h2>
-      <div id="car3d"></div>
-
-      <div class="wave-box">
-        <div class="cap"><span>Impact signature</span><span id="waveLabel">idle</span></div>
-        <canvas id="wave"></canvas>
+    <!-- real FEA field -->
+    <section class="card">
+      <div class="card-head">
+        <div>
+          <div class="eyebrow">SOLIDWORKS · Person 1</div>
+          <div class="card-title">Real FEA stress field</div>
+        </div>
+        <span class="hint"><kbd>drag</kbd> rotate <kbd>scroll</kbd> zoom</span>
       </div>
-    </div>
-  </div>
+      <div id="heatmap3d"></div>
+      <div id="feaEmpty" style="display:none">
+        No FEA field loaded yet. Save Person 1's node export (<code>NodeID,X,Y,Z,Stress_MPa</code>)
+        to <code>data/upright_nodes.csv</code>, then run <code>python data/build_stress_field.py</code>.
+      </div>
+      <div class="fea-legend" id="feaLegend" style="display:none">
+        <span>low</span><div class="fea-bar"></div><span id="feaPeak">peak</span>
+      </div>
+      <div class="fea-note" id="feaNote"></div>
+    </section>
 
-  <!-- REAL FEA STRESS FIELD (Person 1's SOLIDWORKS export) -->
-  <div class="panel full">
-    <h2>Real FEA Stress Field — Upright (SOLIDWORKS)
-      <span style="color:var(--faint);text-transform:none;letter-spacing:0;font-weight:400">· drag to rotate · scroll to zoom</span>
-    </h2>
-    <div id="heatmap3d"></div>
-    <div id="feaEmpty" class="empty" style="display:none">
-      No FEA field loaded yet. Save Person 1's node export (<code>NodeID,X,Y,Z,Stress_MPa</code>)
-      to <code>data/upright_nodes.csv</code>, then run <code>python data/build_stress_field.py</code>.
-    </div>
-    <div class="fea-legend" id="feaLegend" style="display:none">
-      <span>low stress</span><div class="fea-bar"></div><span id="feaPeak">peak</span>
-    </div>
-    <div class="fea-note" id="feaNote"></div>
-  </div>
+    <!-- telemetry -->
+    <section class="card">
+      <div class="card-head">
+        <div>
+          <div class="eyebrow">Telemetry</div>
+          <div class="card-title">Impact log</div>
+        </div>
+      </div>
+      <div class="wave-cap"><span>Impact signature</span><span id="waveLabel">idle</span></div>
+      <canvas id="wave"></canvas>
+      <ol class="log" id="historyBody"></ol>
+      <div class="log-empty" id="historyEmpty">No events yet.</div>
+    </section>
+  </main>
 
-  <!-- HISTORY -->
-  <div class="panel full">
-    <h2>Recent Events</h2>
-    <table>
-      <thead>
-        <tr><th>Time</th><th>Upright</th><th>Fx / Fy / Fz (N)</th><th>Stress (MPa)</th><th>Disp (mm)</th><th>Priority</th></tr>
-      </thead>
-      <tbody id="historyBody"></tbody>
-    </table>
-    <div id="historyEmpty" class="empty">No events yet.</div>
-  </div>
-
-  <!-- DEMO -->
-  <div class="panel demo-panel full">
-    <h2>Demo Controls — Simulate Impact</h2>
-    <div class="demo-row">
-      <span class="lbl">Corner</span>
-      <select id="cornerSelect">
-        <option value="front_left">Front Left</option>
-        <option value="front_right" selected>Front Right</option>
-        <option value="rear_left">Rear Left</option>
-        <option value="rear_right">Rear Right</option>
-      </select>
-      <button class="demo-btn mild"     onclick="simulateImpact('mild')">Mild tap</button>
-      <button class="demo-btn moderate" onclick="simulateImpact('moderate')">Moderate hit</button>
-      <button class="demo-btn severe"   onclick="simulateImpact('severe')">Severe impact</button>
-    </div>
-    <div class="demo-hint">
-      On-stage fallback if the Arduino misbehaves — each button POSTs a preset impact straight to the backend,
-      running the exact same model pipeline as a real hit. Re-check these still land LOW / MODERATE / HIGH after
-      retraining on Person 1's real FEA data.
-    </div>
-  </div>
+  <footer class="foot">
+    <span>Priority bands: moderate at 40% of yield, high at 75%. Out-of-envelope impacts are flagged, not guessed.</span>
+    <span>ImpactIQ · Formula Tech Hack 2026</span>
+  </footer>
+</div>
 
 <script src="vendor/three.min.js"></script>
 <script src="car3d.js"></script>
 <script src="heatmap3d.js"></script>
+<script src="../data/upright_field.js"></script>
 <script>
-  // ================= CONFIG (unchanged contract) =================
+  // ================= CONFIG (backend contract unchanged) =================
   const BACKEND_URL = "http://localhost:8000";
   const POLL_MS = 1500;
-  const priorityColor = { LOW: "#2ee6a0", MODERATE: "#f5b13a", HIGH: "#ff5470" };
-  const priorityGlow  = { LOW: "rgba(46,230,160,.5)", MODERATE: "rgba(245,177,58,.5)", HIGH: "rgba(255,84,112,.55)" };
+  const priorityColor = { LOW: "#34d399", MODERATE: "#fbbf24", HIGH: "#fb4d6d" };
+  const priorityGlow  = { LOW: "rgba(52,211,153,.45)", MODERATE: "rgba(251,191,36,.45)", HIGH: "rgba(251,77,109,.5)" };
   const actionText = {
-    LOW:      ["Cleared to continue", "within safe margin — no inspection required"],
-    MODERATE: ["Inspect before next session", "elevated stress — check for damage"],
-    HIGH:     ["Do not run — inspect now", "approaching material yield"],
+    LOW:      ["Cleared to continue", "Within safe margin. No inspection required."],
+    MODERATE: ["Inspect before next session", "Elevated stress. Check the upright for damage."],
+    HIGH:     ["Do not run. Inspect now.", "Approaching material yield."],
   };
   // Force vectors (N) tuned to reliably land each priority. (Duplicated in check_demo.py.)
   const DEMO_PRESETS = {
@@ -379,14 +446,17 @@
     moderate: { Fx: 3400, Fy: -2000, Fz: 4300 },
     severe:   { Fx: 7000, Fy: 5000,  Fz: -6500 },
   };
+  const CORNERS = ["front_left", "front_right", "rear_left", "rear_right"];
+  const CORNER_NAME = { front_left: "Front left", front_right: "Front right", rear_left: "Rear left", rear_right: "Rear right" };
+  const reducedMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-  // ---- in-browser surrogate (mock) so a static host (GitHub Pages/Vercel) works
-  //      with no backend. When the FastAPI backend IS reachable, we use it instead.
+  // ---- in-browser surrogate so a static host (GitHub Pages/Vercel) works with no
+  //      backend. When the FastAPI backend IS reachable, we use it instead.
   //      Coefficients calibrated so the presets reproduce the trained model's bands. ----
   const MOCK = {
     yield: 503.0, moderate_MPa: 201.2, high_MPa: 377.25, mag_max: 9439,
     k_stress: 0.04106, k_disp: 0.00328,
-    material: "Al 7075-T6", r2: "97%", rows: 400,
+    material: "Al 7075-T6", r2: "0.96", rows: 400,
   };
   let mockMode = false;
   const mockLog = [];
@@ -415,72 +485,72 @@
     });
   }
 
-  // gauge full-scale = 125% of yield, so 100% sits below the top and there's a red headroom zone.
-  const GAUGE_MAX = 1.25;
   const el = id => document.getElementById(id);
+  const hex = s => parseInt(s.slice(1), 16);
+  let selectedCorner = "front_right";
 
   // ================= GAUGE =================
-  // 270° arc, from lower-left (225°) sweeping over the top to lower-right (-45°).
-  function gaugePolar(cx, cy, r, t) {           // t in [0,1] along the sweep
-    const deg = 225 - 270 * t;
-    const a = deg * Math.PI / 180;
-    return [cx + r * Math.cos(a), cy - r * Math.sin(a)];
-  }
-  function gaugePoints(t0, t1) {
-    const pts = [];
-    const N = 90;
-    for (let i = 0; i <= N; i++) {
-      const t = t0 + (t1 - t0) * (i / N);
-      pts.push(gaugePolar(105, 110, 82, t).map(v => v.toFixed(1)).join(","));
-    }
+  // 240° arc on a 0–125% of yield scale, with the real 40% / 75% bands drawn as zones.
+  const GAUGE_MAX = 1.25, GC = { cx: 130, cy: 122, r: 96 }, SWEEP = 240, START = 210;
+  function gp(r, t) { const d = (START - SWEEP * t) * Math.PI / 180; return [GC.cx + r * Math.cos(d), GC.cy - r * Math.sin(d)]; }
+  function arc(t0, t1) {
+    const n = Math.max(2, Math.ceil((t1 - t0) * 120)), pts = [];
+    for (let i = 0; i <= n; i++) pts.push(gp(GC.r, t0 + (t1 - t0) * i / n).map(v => v.toFixed(1)).join(","));
     return pts.join(" ");
   }
   function initGauge() {
-    el("gaugeTrack").setAttribute("points", gaugePoints(0, 1));
-    // threshold ticks at 40% and 75% of yield (mapped onto the 0..125% scale)
-    const ticks = [0.40, 0.75].map(f => f / GAUGE_MAX);
-    el("gaugeTicks").innerHTML = ticks.map(t => {
-      const [x1, y1] = gaugePolar(105, 110, 74, t);
-      const [x2, y2] = gaugePolar(105, 110, 90, t);
-      return `<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}"/>`;
+    const m = f => f / GAUGE_MAX;
+    el("gzLow").setAttribute("points", arc(0, m(0.4)));
+    el("gzMod").setAttribute("points", arc(m(0.4), m(0.75)));
+    el("gzHigh").setAttribute("points", arc(m(0.75), 1));
+    el("gaugeTicks").innerHTML = [[0.4, "40%"], [0.75, "75%"], [1, "yield"]].map(([f, lab]) => {
+      const t = m(f), [x1, y1] = gp(GC.r - 11, t), [x2, y2] = gp(GC.r + 11, t), [lx, ly] = gp(GC.r + 24, t);
+      return `<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="#0e131a" stroke-width="3"></line>` +
+             `<text x="${lx.toFixed(1)}" y="${(ly + 3).toFixed(1)}" fill="#5f6a7c" font-size="10" font-family="IBM Plex Mono, monospace" text-anchor="middle">${lab}</text>`;
     }).join("");
   }
   function setGauge(fraction, color) {
-    const t = Math.max(0, Math.min(1, fraction / GAUGE_MAX));
-    el("gaugeFill").setAttribute("points", gaugePoints(0, Math.max(0.001, t)));
+    const t = Math.max(0.004, Math.min(1, fraction / GAUGE_MAX));
+    el("gaugeFill").setAttribute("points", arc(0, t));
     el("gaugeFill").setAttribute("stroke", color);
   }
 
-  // ================= animated count-up =================
+  // ================= count-up =================
   function animateValue(node, to, decimals, dur = 650) {
-    const from = parseFloat(node.dataset.v || "0");
-    const start = performance.now();
+    const from = parseFloat(node.dataset.v || "0"), start = performance.now();
     node.dataset.v = to;
-    function step(now) {
-      const p = Math.min(1, (now - start) / dur);
-      const e = 1 - Math.pow(1 - p, 3);           // easeOutCubic
-      const val = from + (to - from) * e;
-      node.textContent = decimals === 0
-        ? Math.round(val).toLocaleString()
-        : val.toFixed(decimals);
+    const fmt = v => decimals === 0 ? Math.round(v).toLocaleString() : v.toFixed(decimals);
+    if (reducedMotion) { node.textContent = fmt(to); return; }
+    (function step(now) {
+      const p = Math.min(1, (now - start) / dur), e = 1 - Math.pow(1 - p, 3);
+      node.textContent = fmt(from + (to - from) * e);
       if (p < 1) requestAnimationFrame(step);
-    }
-    requestAnimationFrame(step);
+    })(start);
   }
 
-  // ================= 3D car (car3d.js / Three.js) =================
-  const hex = s => parseInt((s || "#5b8cff").replace("#", ""), 16);
+  // ================= 3D car =================
   function resetDots() { if (window.Car3D) Car3D.reset(); }
-  function highlightUpright(id, priority) {
-    if (window.Car3D) Car3D.highlight(id, hex(priorityColor[priority]), priority);
+  function highlightUpright(id, p) { if (window.Car3D) Car3D.setActive(id, hex(priorityColor[p]), p); }
+  function impactFx(id, p) { if (window.Car3D) Car3D.impact(id, hex(priorityColor[p]), p); }
+  function updateCornerTags(events) {
+    if (!window.Car3D) return;
+    const latest = {};
+    (events || []).forEach(e => { latest[e.upright_id] = e; });
+    CORNERS.forEach(c => {
+      const e = latest[c];
+      Car3D.setCornerStatus(c, e ? e.priority : null, e ? `${Math.round(e.predicted_von_mises_stress_MPa)} MPa` : "clear");
+    });
+  }
+  function selectCorner(id) {
+    selectedCorner = id;
+    document.querySelectorAll("#cornerSeg button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.corner === id)));
+    if (window.Car3D) Car3D.setSelected(id);
   }
 
-  // ================= impact waveform (canvas, no libs) =================
+  // ================= impact waveform =================
   const cvs = el("wave"), ctx = cvs.getContext("2d");
   const NSAMP = 260;
-  let samples = new Array(NSAMP).fill(0);
-  let burst = { t: 999, amp: 0, freq: 9 };
-  let waveColor = "#5b8cff";
+  let samples = new Array(NSAMP).fill(0), burst = { t: 999, amp: 0, freq: 9 }, waveColor = "#7fa8ff";
   function sizeCanvas() {
     const dpr = window.devicePixelRatio || 1;
     cvs.width = cvs.clientWidth * dpr; cvs.height = cvs.clientHeight * dpr;
@@ -488,131 +558,115 @@
   }
   function triggerBurst(magnitude, color) {
     burst = { t: 0, amp: Math.max(0.22, Math.min(1, magnitude / 9000)), freq: 9 };
-    waveColor = color;
-    el("waveLabel").textContent = "impact detected";
+    waveColor = color; el("waveLabel").textContent = "impact detected";
   }
   function stepWave() {
     samples.shift();
-    let v = (Math.random() - 0.5) * 0.03;         // idle noise
+    let v = (Math.random() - 0.5) * 0.03;
     if (burst.amp > 0.002) {
       v += burst.amp * Math.sin(burst.t * burst.freq) * Math.exp(-burst.t * 2.6);
       burst.t += 0.07;
       if (burst.t > 3.2) { burst.amp = 0; el("waveLabel").textContent = "idle"; }
     }
-    samples.push(v);
-    drawWave();
+    samples.push(v); drawWave();
   }
   function drawWave() {
     const w = cvs.clientWidth, h = cvs.clientHeight, mid = h / 2;
     ctx.clearRect(0, 0, w, h);
-    ctx.strokeStyle = "rgba(255,255,255,.06)";
-    ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(0, mid); ctx.lineTo(w, mid); ctx.stroke();
+    ctx.strokeStyle = "rgba(148,165,190,.07)"; ctx.lineWidth = 1;
+    for (let x = 0; x < w; x += 32) { ctx.beginPath(); ctx.moveTo(x + 0.5, 0); ctx.lineTo(x + 0.5, h); ctx.stroke(); }
+    ctx.beginPath(); ctx.moveTo(0, mid); ctx.lineTo(w, mid); ctx.stroke();
     ctx.beginPath();
     for (let i = 0; i < NSAMP; i++) {
-      const x = (i / (NSAMP - 1)) * w;
-      const y = mid - samples[i] * (h * 0.42);
+      const x = (i / (NSAMP - 1)) * w, y = mid - samples[i] * (h * 0.42);
       i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
     }
-    ctx.strokeStyle = waveColor; ctx.lineWidth = 2;
-    ctx.shadowColor = waveColor; ctx.shadowBlur = 8;
+    ctx.strokeStyle = waveColor; ctx.lineWidth = 2; ctx.shadowColor = waveColor; ctx.shadowBlur = 10;
     ctx.stroke(); ctx.shadowBlur = 0;
   }
 
   // ================= rendering =================
-  function fmtTime(iso) { try { return new Date(iso).toLocaleTimeString(); } catch { return iso; } }
+  function fmtTime(iso) { try { return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }); } catch { return iso; } }
   let lastKey = null;
 
   function renderLatest(evt) {
     const isEvent = evt && !evt.message;
     el("emptyHero").style.display = isEvent ? "none" : "block";
     el("heroContent").style.display = isEvent ? "block" : "none";
-    el("liveTag").style.display = isEvent ? "inline" : "none";
+    el("liveTag").style.display = isEvent ? "inline-flex" : "none";
     if (!isEvent) { resetDots(); lastKey = null; return; }
 
-    const p = evt.priority;
-    const color = priorityColor[p];
-    const isNew = evt.timestamp !== lastKey;
+    const p = evt.priority, color = priorityColor[p], isNew = evt.timestamp !== lastKey;
     lastKey = evt.timestamp;
 
-    // verdict
     const word = el("verdictWord");
-    word.textContent = p;
-    word.className = "word pr" + p;
+    word.textContent = p === "MODERATE" ? "Moderate" : p === "HIGH" ? "High" : "Low";
+    word.className = "verdict-word pr" + p;
     word.style.setProperty("--glow", priorityGlow[p]);
-    el("verdictAction").innerHTML =
-      `${actionText[p][0]}<div class="sub">${actionText[p][1]}</div>`;
+    el("cornerBadge").textContent = CORNER_NAME[evt.upright_id] || evt.upright_id;
+    el("verdictAction").innerHTML = `${actionText[p][0]}<div class="sub">${actionText[p][1]}</div>`;
 
-    // hero edge + flash on a genuinely new event
     const hero = el("heroPanel");
     hero.style.setProperty("--edge", color);
     if (isNew) { hero.classList.remove("flash"); void hero.offsetWidth; hero.classList.add("flash"); }
 
-    // gauge
     const frac = evt.fraction_of_yield;
     setGauge(frac, color);
     const pctNode = el("gaugePct");
-    animateValue({ // wrap so we can keep the % suffix
-      dataset: pctNode.dataset,
-      set textContent(v) { pctNode.innerHTML = v + '<small style="font-size:20px">%</small>'; }
-    }, frac * 100, 0);
+    animateValue({ dataset: pctNode.dataset, set textContent(v) { pctNode.innerHTML = v + "<small>%</small>"; } }, frac * 100, 0);
 
-    // metrics
-    animateValue(el("stressVal"), evt.predicted_von_mises_stress_MPa, 0);
+    const stress = evt.predicted_von_mises_stress_MPa, yieldMPa = evt.yield_strength_MPa || MOCK.yield;
+    animateValue(el("stressVal"), stress, 0);
     animateValue(el("dispVal"), evt.predicted_max_displacement_mm, 3);
     const mag = Math.hypot(evt.input.Fx, evt.input.Fy, evt.input.Fz);
     animateValue(el("forceVal"), mag, 0);
-    el("uprightVal").textContent = evt.upright_id.replace("_", " ");
+    animateValue(el("fosVal"), stress > 0 ? yieldMPa / stress : 0, 2);
 
-    // meta
     el("metaInfo").innerHTML =
-      `Detected ${fmtTime(evt.timestamp)} &middot; source <code>${evt.source}</code> &middot; ` +
-      `input <code>Fx ${evt.input.Fx.toFixed(0)} · Fy ${evt.input.Fy.toFixed(0)} · Fz ${evt.input.Fz.toFixed(0)} N</code> ` +
-      `&middot; model <code>${evt.model_type}</code>`;
+      `Detected ${fmtTime(evt.timestamp)} · source <code>${evt.source}</code><br>` +
+      `F = <code>${evt.input.Fx.toFixed(0)}, ${evt.input.Fy.toFixed(0)}, ${evt.input.Fz.toFixed(0)} N</code> · model <code>${evt.model_type}</code>`;
 
-    // envelope
     const warn = el("envelopeWarn");
     if (evt.in_envelope === false) {
       warn.style.display = "block";
-      warn.innerHTML = "&#9888; <b>Outside trained envelope</b> — this impact is larger than any case the "
-        + "model was trained on, so the prediction is an extrapolation. Treat as HIGH and inspect directly.<br>"
+      warn.innerHTML = "<b>Outside trained envelope.</b> This impact is larger than any case the model was trained on, "
+        + "so the number is an extrapolation. Treat it as high and inspect directly.<br>"
         + "<span style='opacity:.85'>" + (evt.extrapolation_warning || "") + "</span>";
     } else { warn.style.display = "none"; }
 
     highlightUpright(evt.upright_id, p);
-    if (isNew) triggerBurst(mag, color);
+    if (isNew) { impactFx(evt.upright_id, p); triggerBurst(mag, color); }
   }
 
   function renderHistory(events) {
     const body = el("historyBody"), empty = el("historyEmpty");
+    updateCornerTags(events);
     if (!events || !events.length) { body.innerHTML = ""; empty.style.display = "block"; return; }
     empty.style.display = "none";
     body.innerHTML = events.slice().reverse().map(e => `
-      <tr class="row-${e.priority}">
-        <td class="mono">${fmtTime(e.timestamp)}</td>
-        <td>${e.upright_id.replace("_"," ")}</td>
-        <td class="mono">${e.input.Fx.toFixed(0)} / ${e.input.Fy.toFixed(0)} / ${e.input.Fz.toFixed(0)}</td>
-        <td class="mono">${e.predicted_von_mises_stress_MPa}</td>
-        <td class="mono">${e.predicted_max_displacement_mm}</td>
-        <td class="pri-tag" style="color:${priorityColor[e.priority]}">${e.priority}</td>
-      </tr>`).join("");
+      <li class="log-row pr-${e.priority}">
+        <span class="log-stripe"></span>
+        <div>
+          <div class="log-top"><span class="log-corner">${CORNER_NAME[e.upright_id] || e.upright_id}</span><span class="pill pill-${e.priority}">${e.priority}</span></div>
+          <div class="log-sub">${Math.round(e.predicted_von_mises_stress_MPa)} MPa · ${e.predicted_max_displacement_mm.toFixed(3)} mm · F ${e.input.Fx.toFixed(0)}/${e.input.Fy.toFixed(0)}/${e.input.Fz.toFixed(0)} N</div>
+        </div>
+        <time class="log-time">${fmtTime(e.timestamp)}</time>
+      </li>`).join("");
   }
 
   function setConn(state) {
     const s = el("connStatus");
-    if (state === "demo") { s.className = "chip status-pill ok"; s.innerHTML = '<span class="dot ok"></span>demo mode · in-browser model'; return; }
-    s.className = "chip status-pill " + (state === "live" ? "ok" : "bad");
-    s.innerHTML = `<span class="dot ${state === "live" ? "ok" : "bad"}"></span>` + (state === "live" ? "backend connected" : "backend offline");
+    const map = { live: ["ok", "Backend connected"], demo: ["ok", "Demo mode · in-browser model"], offline: ["bad", "Backend offline"] };
+    const [cls, label] = map[state] || map.offline;
+    s.className = "status-pill " + cls;
+    s.innerHTML = `<span class="dot"></span>${label}`;
   }
 
-  // credibility chips from /metadata (loaded once)
+  // session strip from /metadata (loaded once)
   let metaLoaded = false;
   function addChips(r2, mat, yld, rows) {
-    const chips = el("chips");
-    const add = (html) => { const c = document.createElement("span"); c.className = "chip"; c.innerHTML = html; chips.insertBefore(c, el("connStatus")); };
-    add(`<span class="k">R²</span> <b>${r2}</b>`);
-    add(`<span class="k">material</span> <b>${mat}</b>`);
-    add(`<span class="k">yield</span> <b>${yld} MPa</b>`);
-    add(`<span class="k">trained on</span> <b>${rows} cases</b>`);
+    el("chips").innerHTML = [["Model R²", r2], ["Material", mat], ["Yield", `${yld} MPa`], ["Trained on", `${rows} cases`]]
+      .map(([k, v]) => `<div class="kv"><span class="k">${k}</span><span class="v">${v}</span></div>`).join("");
   }
   async function loadMetadata() {
     if (metaLoaded) return;
@@ -620,8 +674,8 @@
     if (mockMode) { addChips(MOCK.r2, MOCK.material, MOCK.yield, MOCK.rows); return; }
     try {
       const m = await (await fetch(BACKEND_URL + "/metadata")).json();
-      const mat = (m.material && m.material.material_name || "").split("(")[0].trim() || "material";
-      const r2 = m.metrics ? (m.metrics.stress_R2 * 100).toFixed(0) + "%" : "—";
+      const mat = (m.material && m.material.material_name || "").split("(")[0].trim() || "—";
+      const r2 = m.metrics ? m.metrics.stress_R2.toFixed(2) : "—";
       addChips(r2, mat, m.material ? m.material.yield_strength_MPa : "—", m.n_training_rows || "—");
     } catch (e) { metaLoaded = false; }
   }
@@ -634,62 +688,67 @@
       return;
     }
     try {
-      const [lr, hr] = await Promise.all([
-        fetch(BACKEND_URL + "/latest"),
-        fetch(BACKEND_URL + "/history?limit=25"),
-      ]);
-      const latest = await lr.json();
-      const history = await hr.json();
-      setConn("live");
-      loadMetadata();
-      renderLatest(latest);
-      renderHistory(history.events);
+      const [lr, hr] = await Promise.all([fetch(BACKEND_URL + "/latest"), fetch(BACKEND_URL + "/history?limit=25")]);
+      const latest = await lr.json(), history = await hr.json();
+      setConn("live"); loadMetadata();
+      renderLatest(latest); renderHistory(history.events);
     } catch (e) { setConn("offline"); }
   }
 
   function simulateImpact(sev) {
     const preset = DEMO_PRESETS[sev];
-    const upright = el("cornerSelect").value;
+    if (!preset) return;
     if (mockMode) {
-      mockLog.push(mockPredict(preset.Fx, preset.Fy, preset.Fz, upright, "demo"));
+      mockLog.push(mockPredict(preset.Fx, preset.Fy, preset.Fz, selectedCorner, "demo"));
       if (mockLog.length > 25) mockLog.shift();
       poll(); return;
     }
     fetch(BACKEND_URL + "/impact", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...preset, upright_id: upright, source: "dashboard_demo" }),
+      body: JSON.stringify({ ...preset, upright_id: selectedCorner, source: "dashboard_demo" }),
     }).then(poll).catch(() => setConn("offline"));
   }
 
   // ================= real FEA stress field =================
   function initHeatmap() {
     if (!window.Heatmap3D) return;
-    Heatmap3D.init("heatmap3d", "../data/upright_field.json")
+    Heatmap3D.init("heatmap3d", window.UPRIGHT_FIELD || "../data/upright_field.json")
       .then(meta => {
         el("feaLegend").style.display = "flex";
         el("feaPeak").textContent = `peak ${meta.peak_stress_MPa} MPa`;
         const b = meta.bounds_mm || {};
         el("feaNote").innerHTML =
-          `<span class="fea-chip">${(meta.n_total || 0).toLocaleString()}</span> real FEA nodes ` +
-          `(${(meta.n_rendered || 0).toLocaleString()} rendered) from Person 1's SOLIDWORKS study` +
-          (b.x ? ` · upright ≈ ${Math.round(b.x[1]-b.x[0])}×${Math.round(b.y[1]-b.y[0])}×${Math.round(b.z[1]-b.z[0])} mm` : "") +
+          `<span class="fea-chip">${(meta.n_total || 0).toLocaleString()}</span> real FEA nodes from Person 1's SOLIDWORKS study` +
+          (b.x ? ` · upright ≈ ${Math.round(b.x[1]-b.x[0])} × ${Math.round(b.y[1]-b.y[0])} × ${Math.round(b.z[1]-b.z[0])} mm` : "") +
           `. ${meta.note || ""}`;
       })
-      .catch(() => {
-        el("heatmap3d").style.display = "none";
-        el("feaEmpty").style.display = "block";
-      });
+      .catch(() => { el("heatmap3d").style.display = "none"; el("feaEmpty").style.display = "block"; });
   }
 
   // ================= boot =================
   (async function boot() {
-    if (window.Car3D) Car3D.init("car3d");
+    if (window.Car3D) Car3D.init("car3d", { onCornerClick: selectCorner, reducedMotion });
+    selectCorner(selectedCorner);
     initHeatmap();
     initGauge();
     sizeCanvas();
     window.addEventListener("resize", sizeCanvas);
     setInterval(stepWave, 28);
+
+    document.querySelectorAll("#cornerSeg button").forEach(b => b.addEventListener("click", () => selectCorner(b.dataset.corner)));
+    document.querySelectorAll(".hit").forEach(b => b.addEventListener("click", () => simulateImpact(b.dataset.sev)));
+    document.addEventListener("keydown", e => {
+      if (e.target.closest("input, textarea, select") || e.metaKey || e.ctrlKey || e.altKey) return;
+      const sev = { "1": "mild", "2": "moderate", "3": "severe" }[e.key];
+      if (sev) simulateImpact(sev);
+    });
+    el("fsBtn").addEventListener("click", () => {
+      const card = el("stageCard");
+      if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+      else if (card.requestFullscreen) card.requestFullscreen().catch(() => {});
+    });
+
     // Use the FastAPI backend if it's reachable; otherwise fall back to the in-browser model.
     let live = false;
     try { const r = await fetch(BACKEND_URL + "/health", { cache: "no-store" }); live = r.ok; } catch (e) { live = false; }
