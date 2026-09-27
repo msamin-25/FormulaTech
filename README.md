@@ -226,11 +226,14 @@ The dashboard is a static site, so Vercel needs no build settings.
 `.vercelignore` keeps CAD files and Python out of the deploy.
 
 1. vercel.com → **Add New → Project** → import `msamin-25/FormulaTech` → **Deploy**.
-2. On its own, the deployed page runs the in-browser model.
-3. With the backend running on your laptop (`./run.sh`), the Vercel page in
-   Chrome switches to the trained model automatically. Chrome may ask to allow
-   access to your local network: allow it. **Connect sensor** reads the
-   Arduino over USB from the Vercel page too.
+2. The deployed page runs the in-browser model and **never** contacts your
+   laptop on its own (so visitors don't get a "local network access" prompt).
+3. **Live sensor on Vercel:** open the page in Chrome or Edge on the laptop the
+   Arduino is plugged into, click **Connect sensor**, pick the Arduino's port.
+   The readout under the impact buttons shows every line the board sends.
+4. **Trained model on Vercel (optional):** run the backend on that laptop
+   (`./run.sh`) and open `https://<your-app>.vercel.app/dashboard/?backend=http://localhost:8000`.
+   Chrome asks to allow local network access: allow it.
 
 ## Person 2 (you) — integration owner
 
