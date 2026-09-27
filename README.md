@@ -92,10 +92,10 @@ python model/validate.py            # writes model/validation.png
 # 4. start the backend (leave running)
 uvicorn backend.app:app --reload --host 0.0.0.0 --port 8000
 
-# 5. start the impact detector — no hardware needed to test:
-python backend/impact_detector.py --simulate
-# or with real Arduino:
-python backend/impact_detector.py --port /dev/ttyUSB0 --baud 115200
+# 5. start the impact detector — plug in Person 3's Arduino first:
+python backend/impact_detector.py                    # auto-finds the port, 9600 baud
+# no hardware? emit Person 3's exact serial output instead:
+python backend/impact_detector.py --simulate-arduino
 
 # 6. open dashboard/index.html in a browser (or `python -m http.server`
 #    from inside dashboard/ and visit http://localhost:8080)
@@ -181,11 +181,16 @@ no code edits.
 
 ## Person 3 — Arduino / dashboard
 
-- `arduino/impact_imu.ino` is a starting point — get it printing
-  `ax,ay,az` lines (in g's) over serial at ~100-200 Hz. That's the entire
-  contract; all detection logic is already written in Python.
-- Once real serial data is flowing: `python backend/impact_detector.py --port <your port>`.
-- `dashboard/index.html` is a working stub — restyle freely, but keep it
+- `arduino/impact_imu.ino` is Person 3's MPU-6500 sketch. It detects hits on
+  the board and prints one line per hit at 9600 baud:
+  `IMPACT,<FRONT|BACK|LEFT|RIGHT>,ax,ay,az,totalG` (g).
+- `python backend/impact_detector.py` auto-finds the Arduino's port, maps the
+  board axes to car axes (board Y- = front, X+ = left, Z up; 1 g of gravity
+  removed from Z), picks the struck corner from the hit direction, converts to
+  force and posts it. The hit shows up on that wheel of the 3D car.
+- Keep the board mounted flat in the calibrated orientation. If real taps all
+  read LOW or all read HIGH, tune `--mass` (default 200 kg).
+- `dashboard/index.html` polls the backend — restyle freely, but keep it
   polling `GET /latest` and `GET /history` on the backend (`BACKEND_URL` is
   a variable at the top of the `<script>` block).
 
@@ -202,7 +207,8 @@ Person 1 or Person 3 before the merge point, your job is just:
 - Boundary conditions and load application in SOLIDWORKS are simplified for
   a prototype — document Person 1's assumption on a methodology slide.
 - The IMU-to-force conversion (`backend/impact_detector.py`) uses a single
-  effective mass for F=ma, not a full multibody dynamics reconstruction —
+  effective mass for F=ma (default 200 kg, a quarter of an ~800 kg F1 car),
+  not a full multibody dynamics reconstruction —
   it's a stand-in for "how much of the car's inertia loads the upright,"
   not a claim about total vehicle mass.
 - Priority thresholds are stress-as-fraction-of-yield cut points

@@ -1,214 +1,273 @@
 #!/usr/bin/env python3
 """
-ImpactIQ — impact detector.
+ImpactIQ — impact detector (serial -> backend bridge).
 
-Reads IMU accelerometer samples (from Arduino over serial, or simulated with
---simulate for testing before hardware is ready), detects an impact event,
-converts it into a representative Fx/Fy/Fz force vector, and POSTs it to the
-backend at /impact.
+Reads Person 3's Arduino (MPU-6500) over serial, turns each impact into a
+representative Fx/Fy/Fz force vector plus the struck corner, and POSTs it to
+the backend at /impact. The dashboard picks it up from there.
 
-EXPECTED SERIAL FORMAT FROM ARDUINO (give this to Person 3 verbatim)
----------------------------------------------------------------------
-One line per sample, comma-separated acceleration in g's, in the FIXED axis
-convention (mount the IMU so its axes line up with these, or remap in
-firmware before printing):
+SERIAL FORMATS UNDERSTOOD
+-------------------------
+1. Person 3's sketch (arduino/impact_imu.ino) — the Arduino detects the impact
+   itself and prints ONE line per hit, at 9600 baud:
 
-    ax,ay,az
+       READY                                   (once, at boot — ignored)
+       IMPACT,<DIRECTION>,<ax>,<ay>,<az>,<totalG>
+       e.g. IMPACT,FRONT,0.42,-3.10,1.25,3.37
 
-Example lines:
-    0.01,-0.02,0.99
-    0.02,0.01,1.01
-    ...
-    -2.31,4.02,3.87      <- impact event: big jump above baseline
+   Accelerations are in g (sensor range +/-16 g). DIRECTION is FRONT / BACK /
+   LEFT / RIGHT from Person 3's calibration of the board's mounting.
 
-Send at roughly 100-200 Hz (a plain `Serial.println(...)` in loop() at that
-rate is fine). Nothing fancy needed — this script does the impact detection,
-not the Arduino.
+2. Plain streaming "ax,ay,az" samples (~100-200 Hz). Detection then happens
+   here: baseline calibration, threshold, peak capture, cooldown.
 
-AXIS CONVENTION (must match Person 1's SOLIDWORKS setup exactly)
-------------------------------------------------------------------
-    ax -> Fx  (longitudinal)
-    ay -> Fy  (lateral)
-    az -> Fz  (vertical)
+BOARD -> CAR AXES (Person 3's calibrated mounting)
+--------------------------------------------------
+    board Y-  = car FRONT       board X+ = car LEFT       board Z+ = up
+    Fx (longitudinal, + forward) = -ay
+    Fy (lateral,      + left)    =  ax
+    Fz (vertical,     + up)      =  az - 1 g   (gravity removed; board mounted flat)
 
-HOW DETECTION WORKS
---------------------
-1. First N samples at startup are averaged as a baseline (mostly gravity,
-   ~1g on whichever axis is "up" if the IMU sits still before the run).
-2. Every new sample's deviation from baseline is computed. When the
-   magnitude of that deviation exceeds --threshold-g, an impact is declared.
-3. The peak deviation during a short capture window right after the trigger
-   is used as the representative acceleration for that impact (impacts are
-   brief; the peak, not the trigger-instant sample, is the representative
-   loading condition).
-4. Peak acceleration (g) * 9.81 * --mass (kg) = representative force (N) per
-   axis. --mass is NOT the whole car's mass — it's an effective mass
-   standing in for how much of the car's inertia loads the upright during a
-   wheel impact. This is a simplification; document it as such on the
-   methodology slide, same as Person 1's boundary conditions.
-5. A cooldown period after each detected impact prevents one physical hit
-   from re-triggering many events as it rings down.
+Corner: front if ay < 0 else rear; left if ax >= 0 else right. This follows
+Person 3's FRONT/BACK/LEFT/RIGHT labels, so a hit lands on one wheel of the car.
+
+FORCE
+-----
+Representative force = acceleration (g) * 9.81 * --mass. The default 200 kg is
+a quarter of an ~800 kg F1 car: the share of the car's inertia one corner
+carries. With it, ~2.5 g reads MODERATE and ~5 g reads HIGH on the current
+model. It is the single tuning knob for the rig: state it on the methodology
+slide next to Person 1's boundary conditions.
 
 USAGE
 -----
-    # simulate without any hardware connected (for testing/demo prep):
-    python backend/impact_detector.py --simulate
-
-    # real hardware:
-    python backend/impact_detector.py --port /dev/ttyUSB0 --baud 115200
+    python backend/impact_detector.py                     # auto-detect the Arduino port
+    python backend/impact_detector.py --port /dev/cu.usbmodem1101
+    python backend/impact_detector.py --simulate-arduino  # fake Person 3 output, no hardware
+    python backend/impact_detector.py --simulate          # fake streaming samples, no hardware
+    python backend/impact_detector.py --dry-run           # print forces, don't POST
 """
 
 import argparse
+import math
 import random
 import sys
 import time
-from collections import deque
 
 import requests
 
 DEFAULT_BACKEND_URL = "http://localhost:8000/impact"
 G_TO_MS2 = 9.81
+PORT_HINTS = ("usbmodem", "usbserial", "wchusbserial", "ttyacm", "ttyusb", "arduino", "ch340", "cp210")
 
 
 def parse_args():
     p = argparse.ArgumentParser(description="ImpactIQ impact detector")
-    p.add_argument("--port", default="/dev/ttyUSB0", help="Serial port for the Arduino")
-    p.add_argument("--baud", type=int, default=115200)
+    p.add_argument("--port", default="auto", help="Serial port, or 'auto' to find the Arduino")
+    p.add_argument("--baud", type=int, default=9600, help="Must match Serial.begin() in the sketch (9600)")
     p.add_argument("--backend-url", default=DEFAULT_BACKEND_URL)
-    p.add_argument("--mass", type=float, default=8.0,
-                    help="Effective mass (kg) for F=ma conversion. Tune this "
-                         "with Person 1 to match the assumed loading scenario.")
-    p.add_argument("--threshold-g", type=float, default=1.5,
-                    help="Deviation-from-baseline magnitude (in g) that counts as an impact.")
-    p.add_argument("--capture-window-s", type=float, default=0.15,
-                    help="How long to watch for the peak after a trigger.")
-    p.add_argument("--cooldown-s", type=float, default=1.0,
-                    help="Minimum time between two separate impact events.")
-    p.add_argument("--upright-id", default="front_left")
-    p.add_argument("--simulate", action="store_true",
-                    help="Generate fake IMU samples instead of reading serial "
-                         "(no hardware needed — for building/demoing before "
-                         "the Arduino side is wired up).")
+    p.add_argument("--mass", type=float, default=200.0,
+                   help="Effective mass (kg) for F = m*a. Default: quarter of an ~800 kg F1 car.")
+    p.add_argument("--gravity-g", type=float, default=1.0,
+                   help="Static reading on board Z to remove (1.0 when mounted flat; 0 to disable)")
+    p.add_argument("--upright-id", default="auto",
+                   help="Force every hit onto one corner (e.g. front_left); 'auto' derives it from the hit")
+    p.add_argument("--threshold-g", type=float, default=1.5, help="[streaming mode] trigger threshold")
+    p.add_argument("--capture-window-s", type=float, default=0.15, help="[streaming mode] peak window")
+    p.add_argument("--cooldown-s", type=float, default=1.0, help="[streaming mode] min time between hits")
+    p.add_argument("--simulate", action="store_true", help="Fake streaming ax,ay,az samples")
+    p.add_argument("--simulate-arduino", action="store_true", help="Fake Person 3's IMPACT lines")
+    p.add_argument("--dry-run", action="store_true", help="Print forces without POSTing")
     return p.parse_args()
 
 
-def sample_source_serial(port, baud):
-    import serial  # imported here so --simulate works without pyserial installed
+# ---------------------------------------------------------------- mapping ---
+
+def board_to_force(ax, ay, az_dev, mass):
+    """Board-frame acceleration (g, gravity already removed) -> car-frame force (N)."""
+    k = G_TO_MS2 * mass
+    return -ay * k, ax * k, az_dev * k
+
+
+def corner_from_board(ax, ay):
+    return ("front" if ay < 0 else "rear") + "_" + ("left" if ax >= 0 else "right")
+
+
+# ---------------------------------------------------------------- sources ---
+
+def find_port():
+    from serial.tools import list_ports
+    ports = list(list_ports.comports())
+    for p in ports:
+        text = f"{p.device} {p.description} {p.manufacturer or ''}".lower()
+        if any(h in text for h in PORT_HINTS):
+            return p.device
+    listed = ", ".join(p.device for p in ports) or "none"
+    raise RuntimeError(f"no Arduino-looking serial port found (ports: {listed}). "
+                       f"Plug it in, or pass --port explicitly.")
+
+
+def open_serial(port, baud):
+    import serial  # imported here so the simulators work without pyserial
+    if port == "auto":
+        port = find_port()
     ser = serial.Serial(port, baud, timeout=1)
-    print(f"Reading IMU samples from {port} @ {baud} baud...")
+    print(f"Listening on {port} @ {baud} baud (Arduino resets on connect; wait for READY)...")
+    return ser
+
+
+def lines_from_serial(ser):
     while True:
         line = ser.readline().decode("utf-8", errors="ignore").strip()
-        if not line:
-            continue
-        try:
-            ax, ay, az = (float(v) for v in line.split(","))
-        except ValueError:
-            continue  # skip malformed lines
-        yield ax, ay, az
+        if line:
+            yield line
 
 
-def sample_source_simulated():
-    """Emits quiet baseline noise most of the time, with an occasional
-    impact burst, so the rest of the pipeline can be built/demoed without
-    waiting on hardware."""
-    print("SIMULATED mode: generating fake IMU samples (no hardware). "
-          "Impacts will fire roughly every 5-10 seconds.")
-    t = 0
-    next_impact_at = random.uniform(5, 10)
+def lines_simulated_arduino():
+    """Emit exactly what Person 3's sketch prints, with a hit every 4-8 s."""
+    print("SIMULATED Arduino: emitting Person 3's IMPACT lines (no hardware).")
+    yield "READY"
     while True:
-        if t >= next_impact_at:
-            # short burst of large acceleration in a random-ish direction
-            burst_len = int(0.2 / 0.01)
-            severity = random.choice(["mild", "moderate", "severe"])
-            peak_g = {"mild": 2.0, "moderate": 4.5, "severe": 7.5}[severity]
-            for _ in range(burst_len):
-                yield (
-                    random.uniform(-peak_g, peak_g),
-                    random.uniform(-peak_g, peak_g),
-                    1.0 + random.uniform(-peak_g, peak_g),
-                )
+        time.sleep(random.uniform(4, 8))
+        direction = random.choice(["FRONT", "BACK", "LEFT", "RIGHT"])
+        g = random.choice([1.4, 3.2, 6.0]) * random.uniform(0.9, 1.1)
+        main, side = g, g * random.uniform(0.1, 0.5)
+        ax, ay = {
+            "FRONT": (random.choice([-1, 1]) * side, -main),
+            "BACK":  (random.choice([-1, 1]) * side, main),
+            "LEFT":  (main, random.choice([-1, 1]) * side),
+            "RIGHT": (-main, random.choice([-1, 1]) * side),
+        }[direction]
+        az = 1.0 + random.uniform(-0.6, 0.6)
+        total = math.sqrt(ax * ax + ay * ay + az * az)
+        yield f"IMPACT,{direction},{ax:.2f},{ay:.2f},{az:.2f},{total:.2f}"
+
+
+def lines_simulated_stream():
+    """Quiet noise with an occasional burst, as 'ax,ay,az' lines."""
+    print("SIMULATED stream: fake ax,ay,az samples (no hardware); a hit every 5-10 s.")
+    t, next_hit = 0.0, random.uniform(5, 10)
+    while True:
+        if t >= next_hit:
+            peak = random.choice([1.4, 3.2, 6.0])
+            for _ in range(20):
+                yield f"{random.uniform(-peak, peak):.3f},{random.uniform(-peak, peak):.3f},{1 + random.uniform(-peak, peak):.3f}"
                 time.sleep(0.01)
-            t = 0
-            next_impact_at = random.uniform(5, 10)
+            t, next_hit = 0.0, random.uniform(5, 10)
         else:
-            yield (random.uniform(-0.03, 0.03), random.uniform(-0.03, 0.03),
-                   1.0 + random.uniform(-0.03, 0.03))
+            yield f"{random.uniform(-.03, .03):.3f},{random.uniform(-.03, .03):.3f},{1 + random.uniform(-.03, .03):.3f}"
             time.sleep(0.01)
             t += 0.01
 
 
-def calibrate_baseline(source, n=50):
-    print(f"Calibrating baseline from {n} samples — keep the IMU still...")
-    samples = []
-    for _ in range(n):
-        samples.append(next(source))
-    bx = sum(s[0] for s in samples) / n
-    by = sum(s[1] for s in samples) / n
-    bz = sum(s[2] for s in samples) / n
-    print(f"Baseline (g): ax={bx:.3f} ay={by:.3f} az={bz:.3f}")
-    return bx, by, bz
+# ------------------------------------------------------------------ output ---
 
-
-def post_impact(backend_url, fx, fy, fz, upright_id, source_label):
-    payload = {"Fx": fx, "Fy": fy, "Fz": fz, "upright_id": upright_id, "source": source_label}
+def report(args, ax, ay, az_dev, label):
+    fx, fy, fz = board_to_force(ax, ay, az_dev, args.mass)
+    corner = corner_from_board(ax, ay) if args.upright_id == "auto" else args.upright_id
+    mag_g = math.sqrt(ax * ax + ay * ay + az_dev * az_dev)
+    print(f"[IMPACT] {label:<14} {mag_g:5.2f} g -> {corner:<11} "
+          f"Fx={fx:8.0f} N  Fy={fy:8.0f} N  Fz={fz:8.0f} N")
+    if args.dry_run:
+        return
+    payload = {"Fx": fx, "Fy": fy, "Fz": fz, "upright_id": corner, "source": label}
     try:
-        resp = requests.post(backend_url, json=payload, timeout=3)
-        resp.raise_for_status()
-        result = resp.json()
-        print(f"  -> POSTed. Backend says: stress={result.get('predicted_von_mises_stress_MPa')}"
-              f"MPa priority={result.get('priority')}")
+        r = requests.post(args.backend_url, json=payload, timeout=3)
+        r.raise_for_status()
+        res = r.json()
+        print(f"         -> {res.get('priority')} ({res.get('predicted_von_mises_stress_MPa')} MPa)"
+              + ("  [outside trained envelope]" if res.get("in_envelope") is False else ""))
     except requests.exceptions.RequestException as e:
-        print(f"  -> WARNING: could not reach backend at {backend_url}: {e}")
+        print(f"         -> WARNING: backend unreachable at {args.backend_url}: {e}")
+
+
+def parse_impact_line(line):
+    """'IMPACT,FRONT,ax,ay,az,totalG' -> (direction, ax, ay, az) or None."""
+    parts = line.split(",")
+    if len(parts) < 5 or parts[0].strip().upper() != "IMPACT":
+        return None
+    try:
+        return parts[1].strip().upper(), float(parts[2]), float(parts[3]), float(parts[4])
+    except ValueError:
+        return None
+
+
+def parse_sample_line(line):
+    try:
+        ax, ay, az = (float(v) for v in line.split(","))
+        return ax, ay, az
+    except ValueError:
+        return None
+
+
+# -------------------------------------------------------------------- main ---
+
+def run(args, lines, source_name):
+    baseline, calib = None, []
+    last_hit = 0.0
+    print(f"Watching for impacts (mass={args.mass:g} kg, gravity={args.gravity_g:g} g, "
+          f"corner={'auto' if args.upright_id == 'auto' else args.upright_id}).")
+    for line in lines:
+        if line.upper() == "READY":
+            print("Arduino says READY.")
+            continue
+
+        hit = parse_impact_line(line)
+        if hit:  # Person 3's format: the Arduino already detected the impact
+            direction, ax, ay, az = hit
+            report(args, ax, ay, az - args.gravity_g, f"{source_name}:{direction.lower()}")
+            continue
+
+        sample = parse_sample_line(line)
+        if sample is None:
+            continue  # debug prints or partial lines
+
+        # streaming format: detect here
+        if baseline is None:
+            calib.append(sample)
+            if len(calib) == 50:
+                baseline = tuple(sum(s[i] for s in calib) / 50 for i in range(3))
+                print("Baseline (g): ax={:.3f} ay={:.3f} az={:.3f}".format(*baseline))
+            continue
+        d = [sample[i] - baseline[i] for i in range(3)]
+        mag = math.sqrt(sum(v * v for v in d))
+        now = time.time()
+        if mag < args.threshold_g or now - last_hit < args.cooldown_s:
+            continue
+        peak, peak_mag, end = d, mag, now + args.capture_window_s
+        for more in lines:
+            s = parse_sample_line(more)
+            if s:
+                d2 = [s[i] - baseline[i] for i in range(3)]
+                m2 = math.sqrt(sum(v * v for v in d2))
+                if m2 > peak_mag:
+                    peak, peak_mag = d2, m2
+            if time.time() >= end:
+                break
+        report(args, peak[0], peak[1], peak[2], source_name)
+        last_hit = time.time()
 
 
 def main():
     args = parse_args()
-
-    if args.simulate:
-        source = sample_source_simulated()
-        source_label = "simulated"
+    if args.simulate_arduino:
+        lines, name = lines_simulated_arduino(), "simulated"
+    elif args.simulate:
+        lines, name = lines_simulated_stream(), "simulated"
     else:
         try:
-            source = sample_source_serial(args.port, args.baud)
+            lines, name = lines_from_serial(open_serial(args.port, args.baud)), "arduino"
         except Exception as e:
-            print(f"ERROR opening serial port {args.port}: {e}")
-            print("Tip: use --simulate to test the rest of the pipeline "
-                  "without hardware connected.")
+            print(f"ERROR opening serial port: {e}")
+            print("Tip: --simulate-arduino runs the whole pipeline without hardware.")
             sys.exit(1)
-        source_label = "arduino"
-
-    bx, by, bz = calibrate_baseline(source)
-
-    last_impact_time = 0
-    print(f"Watching for impacts (threshold={args.threshold_g}g, "
-          f"mass={args.mass}kg)...")
-
-    while True:
-        ax, ay, az = next(source)
-        dx, dy, dz = ax - bx, ay - by, az - bz
-        deviation_mag = (dx ** 2 + dy ** 2 + dz ** 2) ** 0.5
-
-        now = time.time()
-        if deviation_mag >= args.threshold_g and (now - last_impact_time) >= args.cooldown_s:
-            print(f"[TRIGGER] deviation={deviation_mag:.2f}g — capturing peak...")
-            window_end = now + args.capture_window_s
-            peak = (dx, dy, dz)
-            peak_mag = deviation_mag
-            while time.time() < window_end:
-                ax2, ay2, az2 = next(source)
-                d2 = (ax2 - bx, ay2 - by, az2 - bz)
-                mag2 = (d2[0] ** 2 + d2[1] ** 2 + d2[2] ** 2) ** 0.5
-                if mag2 > peak_mag:
-                    peak, peak_mag = d2, mag2
-
-            fx = peak[0] * G_TO_MS2 * args.mass
-            fy = peak[1] * G_TO_MS2 * args.mass
-            fz = peak[2] * G_TO_MS2 * args.mass
-
-            print(f"[IMPACT] peak={peak_mag:.2f}g -> Fx={fx:.1f}N Fy={fy:.1f}N Fz={fz:.1f}N")
-            post_impact(args.backend_url, fx, fy, fz, args.upright_id, source_label)
-
-            last_impact_time = time.time()
+    try:
+        run(args, lines, name)
+    except KeyboardInterrupt:
+        print("\nStopped.")
+    except Exception as e:  # e.g. cable pulled mid-demo
+        print(f"ERROR: {e}")
+        sys.exit(1)
 
 
 if __name__ == "__main__":

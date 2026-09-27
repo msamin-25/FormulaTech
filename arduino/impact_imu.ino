@@ -1,85 +1,109 @@
-/*
- * ImpactIQ — IMU reader for impact detection.
- * Person 3: this is a STARTER template, not a finished sketch — adapt it to
- * whatever IMU you actually have wired up (MPU6050 is assumed below since
- * it's the most common cheap IMU in hackathon kits; swap the library/calls
- * if you're using something else like an LSM6DS3 or an ADXL345).
- *
- * WHAT THIS MUST DO (the contract with the Python side):
- *   Print one line per sample over Serial, comma-separated, in units of g:
- *       ax,ay,az
- *   e.g.:
- *       0.01,-0.02,0.99
- *
- *   Send at roughly 100-200 Hz. That's it — all the impact-detection logic
- *   (thresholding, peak capture, force conversion) lives in
- *   backend/impact_detector.py, not here. Keep this sketch dumb and fast.
- *
- * AXIS CONVENTION — mount the IMU so its axes line up with these, or swap
- * the order/signs below in code so the OUTPUT matches this regardless of
- * physical mounting orientation:
- *   ax -> longitudinal (car's forward/back)
- *   ay -> lateral (car's left/right)
- *   az -> vertical (car's up/down) — will read ~1.0g at rest if flat
- *
- * WIRING (typical MPU6050 on I2C):
- *   MPU6050 VCC -> Arduino 5V (or 3.3V, check your board)
- *   MPU6050 GND -> Arduino GND
- *   MPU6050 SCL -> Arduino SCL (A5 on Uno, 21 on Mega)
- *   MPU6050 SDA -> Arduino SDA (A4 on Uno, 20 on Mega)
- *
- * LIBRARY: Install "Adafruit MPU6050" + "Adafruit Unified Sensor" via the
- * Arduino Library Manager (Sketch -> Include Library -> Manage Libraries).
- */
+// ImpactIQ — Person 3's impact sensor sketch (Arduino + MPU-6500).
+// Detects impacts on-board and prints one machine-readable line per hit:
+//   IMPACT,<FRONT|BACK|LEFT|RIGHT>,ax,ay,az,totalG     (g, 9600 baud)
+// backend/impact_detector.py reads this, maps board axes to car axes,
+// converts to force and posts it to the backend.
 
-#include <Adafruit_MPU6050.h>
-#include <Adafruit_Sensor.h>
 #include <Wire.h>
 
-Adafruit_MPU6050 mpu;
+const byte MPU_ADDR = 0x68;
+const float IMPACT_CHANGE = 0.50;
 
-const unsigned long SAMPLE_INTERVAL_MS = 8;  // ~125 Hz
-unsigned long lastSampleTime = 0;
+float previousG = 1.0;
+unsigned long lastImpact = 0;
 
 void setup() {
-  Serial.begin(115200);
-  while (!Serial) { delay(10); }
+  Wire.begin();
+  Serial.begin(9600);
 
-  if (!mpu.begin()) {
-    Serial.println("ERROR: MPU6050 not found. Check wiring.");
-    while (1) { delay(1000); }
-  }
+  // Wake up MPU-6500
+  Wire.beginTransmission(MPU_ADDR);
+  Wire.write(0x6B);
+  Wire.write(0x00);
+  Wire.endTransmission();
 
-  // +-8g range gives headroom for real impact events without clipping.
-  mpu.setAccelerometerRange(MPU6050_RANGE_8_G);
-  mpu.setGyroRange(MPU6050_RANGE_500_DEG);
-  mpu.setFilterBandwidth(MPU6050_BAND_21_HZ);
+  delay(100);
 
-  Serial.println("ImpactIQ IMU reader ready.");
-  delay(200);
+  // Accelerometer range = +/-16g
+  Wire.beginTransmission(MPU_ADDR);
+  Wire.write(0x1C);
+  Wire.write(0x18);
+  Wire.endTransmission();
+
+  delay(100);
+
+  Serial.println("READY");
 }
 
 void loop() {
-  unsigned long now = millis();
-  if (now - lastSampleTime < SAMPLE_INTERVAL_MS) {
-    return;
+
+  Wire.beginTransmission(MPU_ADDR);
+  Wire.write(0x3B);
+  Wire.endTransmission(false);
+
+  Wire.requestFrom(MPU_ADDR, (byte)6);
+
+  if (Wire.available() >= 6) {
+
+    int16_t rawAx = (Wire.read() << 8) | Wire.read();
+    int16_t rawAy = (Wire.read() << 8) | Wire.read();
+    int16_t rawAz = (Wire.read() << 8) | Wire.read();
+
+    float ax = rawAx / 2048.0;
+    float ay = rawAy / 2048.0;
+    float az = rawAz / 2048.0;
+
+    float totalG = sqrt(ax * ax + ay * ay + az * az);
+    float suddenChange = abs(totalG - previousG);
+
+    if (suddenChange >= IMPACT_CHANGE &&
+        millis() - lastImpact > 1000) {
+
+      String direction;
+
+      // Our calibrated demo orientation:
+      //
+      // Y- = FRONT
+      // Y+ = BACK
+      // X+ = LEFT
+      // X- = RIGHT
+
+      if (abs(ax) >= abs(ay)) {
+
+        if (ax >= 0) {
+          direction = "LEFT";
+        } else {
+          direction = "RIGHT";
+        }
+
+      } else {
+
+        if (ay >= 0) {
+          direction = "BACK";
+        } else {
+          direction = "FRONT";
+        }
+      }
+
+      // Machine-readable output:
+      // IMPACT,DIRECTION,Ax,Ay,Az,TotalG
+
+      Serial.print("IMPACT,");
+      Serial.print(direction);
+      Serial.print(",");
+      Serial.print(ax, 2);
+      Serial.print(",");
+      Serial.print(ay, 2);
+      Serial.print(",");
+      Serial.print(az, 2);
+      Serial.print(",");
+      Serial.println(totalG, 2);
+
+      lastImpact = millis();
+    }
+
+    previousG = totalG;
   }
-  lastSampleTime = now;
 
-  sensors_event_t a, g, temp;
-  mpu.getEvent(&a, &g, &temp);
-
-  // Library returns m/s^2 — convert to g to match the Python side's
-  // expected units (see backend/impact_detector.py header comment).
-  float ax_g = a.acceleration.x / 9.81;
-  float ay_g = a.acceleration.y / 9.81;
-  float az_g = a.acceleration.z / 9.81;
-
-  // If your mounting orientation doesn't match the axis convention above,
-  // remap here, e.g.: Serial.print(az_g); Serial.print(","); ...
-  Serial.print(ax_g, 4);
-  Serial.print(",");
-  Serial.print(ay_g, 4);
-  Serial.print(",");
-  Serial.println(az_g, 4);
+  delay(10);
 }
